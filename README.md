@@ -404,7 +404,7 @@ decision per technique.
 | **lucide-react** | Icons. |
 | **clsx + tailwind-merge** | Conditional classes without specificity fights. |
 
-| **Vitest + Testing Library** | 92 frontend tests: Indian number formatting, component accessibility, the API client's tenant and as-of handling, navigation integrity, and the shared-passport value renderer (a fraction must never print as a count, money must never lose its denomination). jsdom environment. |
+| **Vitest + Testing Library** | 95 frontend tests: Indian number formatting, component accessibility, the API client's tenant and as-of handling, navigation integrity, and the shared-passport value renderer (a fraction must never print as a count, money must never lose its denomination). jsdom environment. |
 
 Deliberately **not** used: a component kit (the screens are built on hand-written
 accessible primitives, so the bundle carries nothing unused), a data-fetching cache

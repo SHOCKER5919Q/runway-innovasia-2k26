@@ -147,3 +147,28 @@ describe("titleCase", () => {
     expect(titleCase("gst_payment")).toBe("Gst Payment");
   });
 });
+
+/* ── chart axis ticks ──────────────────────────────────────────────
+   These wrapped onto two lines in the 64px axis gutter before the axis
+   got its own formatter, because inr(compact) always carries two
+   decimals and a space. */
+describe("compactAxis", () => {
+  it("drops the decimals and the space that made ticks wrap", async () => {
+    const { compactAxis } = await import("@/components/runway/charts");
+    expect(compactAxis(34_00_000 * 100)).toBe("₹34L");   // was "₹34.00 L"
+    expect(compactAxis(8_50_000 * 100)).toBe("₹8.5L");
+    expect(compactAxis(1_00_33_000 * 100)).toBe("₹1Cr");
+    expect(compactAxis(0)).toBe("₹0");
+  });
+
+  it("keeps a decimal only while it adds information", async () => {
+    const { compactAxis } = await import("@/components/runway/charts");
+    expect(compactAxis(12_40_000 * 100)).toBe("₹12L");   // >= 10, rounded
+    expect(compactAxis(2_30_000 * 100)).toBe("₹2.3L");
+  });
+
+  it("marks a negative tick with a real minus sign", async () => {
+    const { compactAxis } = await import("@/components/runway/charts");
+    expect(compactAxis(-1_20_000 * 100)).toBe("−₹1.2L");
+  });
+});

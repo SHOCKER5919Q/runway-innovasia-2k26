@@ -37,7 +37,10 @@ function Bars({ depth, hue, lit }: { depth: number; hue: string; lit: number }) 
       const mat = m.material as THREE.MeshStandardMaterial;
       // A slow travelling pulse along the series, so the chart reads as live.
       const wave = 0.5 + 0.5 * Math.sin(t * 1.1 - i * 0.42);
-      mat.emissiveIntensity = lit * (0.9 + wave * 1.1);
+      // Capped well under 1. With toneMapped off and a range up to 2.0 the
+      // bars clipped straight to white, and the frosted panel then smeared
+      // the clipped pixels into one glowing blob instead of a chart.
+      mat.emissiveIntensity = lit * (0.34 + wave * 0.42);
     });
   });
 
@@ -48,10 +51,12 @@ function Bars({ depth, hue, lit }: { depth: number; hue: string; lit: number }) 
         const x = (i - (SERIES.length - 1) / 2) * 0.205;   // spans 2.46 inside a 3.3 panel
         return (
           <mesh key={i} position={[x, -1.85 + h / 2, 0]}>
-            <boxGeometry args={[0.105, h, 0.105]} />
+            <boxGeometry args={[0.125, h, 0.1]} />
+            {/* A dark body keeps the gaps between bars readable; the colour
+                arrives as emission, not as albedo. */}
             <meshStandardMaterial
-              color={hue} emissive={hue} emissiveIntensity={1}
-              toneMapped={false} roughness={0.2} metalness={0} />
+              color="#0a1f17" emissive={hue} emissiveIntensity={0.5}
+              roughness={0.35} metalness={0} />
           </mesh>
         );
       })}
@@ -73,11 +78,11 @@ function Panel({
           roughness={0.06} metalness={0.15} />
       ) : (
         <MeshTransmissionMaterial
-          samples={8} resolution={320} transmission={1} thickness={0.6}
-          roughness={0.05} ior={1.25} chromaticAberration={0.7}
-          anisotropy={0.35} distortion={0.16} distortionScale={0.25}
-          temporalDistortion={0.05} attenuationDistance={2.4}
-          attenuationColor="#6fe6b4" color="#cdf7e6"
+          samples={8} resolution={320} transmission={1} thickness={0.45}
+          roughness={0.08} ior={1.22} chromaticAberration={0.28}
+          anisotropy={0.2} distortion={0.07} distortionScale={0.16}
+          temporalDistortion={0.04} attenuationDistance={5.0}
+          attenuationColor="#9fe9c9" color="#e6f6ef"
         />
       )}
     </RoundedBox>
@@ -115,10 +120,10 @@ function Scene({ cheap }: { cheap: boolean }) {
           <Panel z={-2.1} rotation={[0, 0.14, 0.036]} scale={0.94} cheap={cheap} />
 
           {/* Rim light so the sheet edges catch, as they do in the reference. */}
-          <pointLight position={[-3.4, 2.4, 3.0]} intensity={18} color={LIME} distance={13} />
-          <pointLight position={[3.4, -1.6, 2.4]} intensity={14} color={CYAN} distance={13} />
-          <pointLight position={[0, 0, -4]} intensity={12} color={EMERALD} distance={11} />
-          <pointLight position={[-1.4, 2.6, 3.4]} intensity={7} color="#ffffff" distance={10} />
+          <pointLight position={[-3.4, 2.4, 3.0]} intensity={9} color={LIME} distance={13} />
+          <pointLight position={[3.4, -1.6, 2.4]} intensity={7} color={CYAN} distance={13} />
+          <pointLight position={[0, 0, -4]} intensity={6} color={EMERALD} distance={11} />
+          <pointLight position={[-1.4, 2.6, 3.4]} intensity={4} color="#ffffff" distance={10} />
         </group>
       </Float>
     </group>
@@ -161,7 +166,7 @@ export default function Hero3D({ className }: { className?: string }) {
         camera={{ position: [0.4, 0.2, 8.0], fov: 40 }}
       >
         <Suspense fallback={null}>
-          <ambientLight intensity={0.35} />
+          <ambientLight intensity={0.22} />
           <directionalLight position={[4, 6, 6]} intensity={1.1} />
           <Scene cheap={cheap} />
           {!cheap && <Environment preset="city" environmentIntensity={0.6} />}

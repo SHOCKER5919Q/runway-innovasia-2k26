@@ -32,8 +32,28 @@ export const C = {
 
 const AXIS = { stroke: C.tick, fontSize: 11, tickLine: false, axisLine: false } as const;
 
+/** Axis-tick money. Deliberately NOT `inr(v, {compact:true})`: that always
+ *  carries two decimals and a space ("₹34.00 L"), which overflows a 64px
+ *  axis gutter and wraps onto a second line. An axis needs the magnitude,
+ *  not the paise — the tooltip carries the exact figure. */
 export function compactAxis(v: number) {
-  return inr(v, { compact: true });
+  if (v === null || v === undefined || Number.isNaN(v)) return "";
+  const neg = v < 0;
+  const rupees = Math.abs(v) / 100;
+  const unit = (n: number, d: number, suffix: string) => {
+    const q = n / d;
+    // One decimal only while it still adds information: 8.5L keeps it,
+    // 12L and 1Cr do not.
+    if (q >= 10) return `${Math.round(q)}${suffix}`;
+    const one = q.toFixed(1);
+    return `${one.endsWith(".0") ? one.slice(0, -2) : one}${suffix}`;
+  };
+  let body: string;
+  if (rupees >= 1_00_00_000) body = unit(rupees, 1_00_00_000, "Cr");
+  else if (rupees >= 1_00_000) body = unit(rupees, 1_00_000, "L");
+  else if (rupees >= 1_000) body = unit(rupees, 1_000, "K");
+  else body = String(Math.round(rupees));
+  return `${neg ? "−" : ""}₹${body}`;
 }
 
 export function ChartTip({ active, payload, label, labelFormat, valueFormat }: any) {
@@ -107,7 +127,7 @@ export function CashBandChart({
         </defs>
         <CartesianGrid stroke={C.grid} strokeDasharray="3 3" vertical={false} />
         <XAxis dataKey="week" {...AXIS} tickFormatter={shortDate} minTickGap={18} />
-        <YAxis {...AXIS} tickFormatter={compactAxis} width={64} />
+        <YAxis {...AXIS} tickFormatter={compactAxis} width={56} />
         <Tooltip
           content={<ChartTip labelFormat={(l: string) => `Week of ${shortDate(l)}`} />}
           cursor={{ stroke: C.grid, strokeWidth: 1 }}
