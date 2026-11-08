@@ -34,7 +34,8 @@ be mistaken for a bank balance.
 ## Quick start
 
 ```bash
-cd /home/shocker/INNOVASIA
+git clone https://github.com/SHOCKER5919Q/runway-innovasia-2k26.git
+cd runway-innovasia-2k26
 
 ./run.sh setup          # create the venv, install everything, seed the demo
 ./run.sh dev            # API on :8000, web app on :3000
@@ -59,7 +60,7 @@ Then open **http://localhost:3000** and sign in:
 ./run.sh seed C         # regenerate the workspace under scenario C
 ./run.sh test           # 210 backend tests (SQLite)
 ./run.sh test-pg        # the identical suite against PostgreSQL
-./run.sh test-web       # 75 frontend tests
+./run.sh test-web       # 95 frontend tests
 ./run.sh test-all       # both
 ./run.sh verify         # ~5,000 accounting-invariant checks
 ./run.sh audit-schema   # every VARCHAR checked against what the code can write

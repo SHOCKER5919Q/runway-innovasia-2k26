@@ -93,7 +93,7 @@ visible by looking at a chart.
 ## Running just the three-state surface
 
 ```bash
-cd /home/shocker/INNOVASIA
+cd runway-innovasia-2k26   # the repository root
 backend/.venv/bin/python -m pytest \
   tests/test_three_state.py \
   tests/test_ledger_invariants.py \
