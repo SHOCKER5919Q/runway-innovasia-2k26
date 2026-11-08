@@ -58,7 +58,7 @@ Then open **http://localhost:3000** and sign in:
 ./run.sh api            # API only          -> http://127.0.0.1:8000/docs
 ./run.sh web            # web app only      -> http://localhost:3000
 ./run.sh seed C         # regenerate the workspace under scenario C
-./run.sh test           # 210 backend tests (SQLite)
+./run.sh test           # 211 backend tests (SQLite)
 ./run.sh test-pg        # the identical suite against PostgreSQL
 ./run.sh test-web       # 95 frontend tests
 ./run.sh test-all       # both
@@ -90,7 +90,7 @@ cd backend && .venv/bin/python -m app.seed.seed --scenario D --reset --date 2026
 default database is SQLite, so there is no Postgres, Redis or Docker to stand up.
 
 **PostgreSQL is supported and verified**, not merely claimed. The schema migrates,
-the full workspace seeds, and the identical 210-test suite passes against it:
+the full workspace seeds, and the identical 211-test suite passes against it:
 
 ```bash
 createdb runway
@@ -140,7 +140,7 @@ stored in the frontend, and none is specific to a scenario.
 **It separates reality from expectation.** Three states, three storage models, three
 visual treatments. The forecast is never drawn with the same line as the bank balance.
 
-**It is portable, and proves it.** The same 210 tests pass on SQLite and PostgreSQL.
+**It is portable, and proves it.** The same 211 tests pass on SQLite and PostgreSQL.
 Getting there found three `VARCHAR` overflows that SQLite silently tolerates and
 Postgres rejects — two of which the demo data never exercised. `./run.sh audit-schema`
 now makes that class of bug impossible to reintroduce.
@@ -380,7 +380,7 @@ splits use the largest-remainder method so no paise is ever lost. This is why
 | **pypdf** | Text-layer PDF invoice extraction — GST e-invoices, Tally, Zoho, Busy. |
 | **tesseract / poppler** (system, optional) | OCR for *scanned* PDFs. Shelled out to rather than imported, because the binary has to be installed either way and this keeps the Python dependency list clean. |
 | **psycopg 3** | PostgreSQL driver. Optional; the default is SQLite. |
-| **pytest** | 210 tests, green on both SQLite and PostgreSQL. |
+| **pytest** | 211 tests, green on both SQLite and PostgreSQL. |
 
 Conformal prediction, Monte Carlo, VaR/CVaR, HHI and the stress-test harness are
 **implemented directly** rather than pulled from MAPIE, Riskfolio-Lib or
@@ -503,7 +503,7 @@ INNOVASIA/
 │   └── tests/                    75 frontend tests
 │       ├── migrations/           Alembic revisions
 │       └── seed/                 synthetic MSME generator, 5 scenarios
-├── tests/                        210 backend tests across 9 files
+├── tests/                        211 backend tests across 9 files
 ├── scripts/                      evaluate_models.py, verify_ledger.py, audit_schema.py
 ├── docs/                         32 documents
 └── Reference/                    the supplied design board (unmodified)

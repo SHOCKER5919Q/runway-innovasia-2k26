@@ -76,6 +76,14 @@ def seed(scenario: str = "B", *, reset: bool = False, today: date | None = None,
     today = today or date.today()
     if reset:
         Base.metadata.drop_all(bind=engine)
+        # drop_all only knows the mapped tables. alembic_version is not one of
+        # them, so it survives — and create_all() treats its presence as "this
+        # database is under migration control" and returns without creating
+        # anything. The next query then dies on `no such table: users`. That
+        # made --reset work exactly once: on a database that had never been
+        # stamped, i.e. never set up by ./run.sh.
+        with engine.begin() as conn:
+            conn.exec_driver_sql("DROP TABLE IF EXISTS alembic_version")
     create_all()
     db = SessionLocal()
     out: dict = {"scenario": scenario, "today": today.isoformat(), "businesses": []}

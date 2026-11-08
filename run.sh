@@ -52,7 +52,16 @@ setup() {
   ok "web dependencies installed ($PKG)"
 
   seed "${1:-B}"
-  ok "migrations at $("$BACKEND/.venv/bin/alembic" -c "$BACKEND/alembic.ini" heads 2>/dev/null | head -1)"
+  # alembic.ini sets a RELATIVE script_location (migrations), so this has to
+  # run from backend/ like every other alembic call in this file. It did not,
+  # so it printed alembic's "Path doesn't exist" error behind a green tick.
+  local heads
+  heads="$(cd "$BACKEND" && "$BACKEND/.venv/bin/alembic" heads 2>/dev/null | head -1 || true)"
+  if [ -n "$heads" ] && [[ "$heads" != *FAILED* ]]; then
+    ok "migrations at $heads"
+  else
+    printf "\033[38;5;215m  ! could not read the migration head\033[0m\n"
+  fi
   c "Done. Start everything with:  ./run.sh dev"
 }
 

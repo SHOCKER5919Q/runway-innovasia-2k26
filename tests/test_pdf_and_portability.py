@@ -255,3 +255,65 @@ def test_the_api_omits_the_long_horizon_where_it_is_irrelevant(client, owner_aut
                           "paths": 600})
     assert r.status_code == 200
     assert r.json()["long_horizon"] is None
+
+
+
+def test_reset_reseed_works_on_a_stamped_database(tmp_path):
+    """``--reset`` must work on a database that ./run.sh setup has stamped.
+
+    Regression. ``Base.metadata.drop_all`` only knows the mapped tables, so
+    ``alembic_version`` survived a reset. ``create_all()`` reads that table's
+    presence as "this schema is under migration control" and returns without
+    creating anything, so the very next query died on ``no such table: users``.
+
+    The effect was that ``--reset`` worked exactly once -- on a database that
+    had never been stamped. Every ``./run.sh seed <scenario>`` and
+    ``./run.sh reset`` after the first setup failed, which is every one a user
+    would actually run.
+
+    This runs the seeder as a subprocess, the way run.sh does. Doing it
+    in-process would mean reloading app.core.db to repoint the module-level
+    engine, which swaps the engine every other test in the session is holding.
+    """
+    import os
+    import sqlite3
+    import subprocess
+    import sys
+    from pathlib import Path
+
+    root = Path(__file__).resolve().parents[1]
+    backend = root / "backend"
+    venv_py = backend / ".venv" / "bin" / "python"
+    py = str(venv_py) if venv_py.exists() else sys.executable
+
+    db_path = tmp_path / "reseed.db"
+    env = {**os.environ, "RUNWAY_DATABASE_URL": f"sqlite:///{db_path}"}
+
+    def run_seed(scenario: str):
+        return subprocess.run(
+            [py, "-m", "app.seed.seed", "--scenario", scenario,
+             "--reset", "--no-second", "--date", "2026-11-07"],
+            cwd=backend, env=env, capture_output=True, text=True, timeout=600,
+        )
+
+    first = run_seed("B")
+    assert first.returncode == 0, f"first seed failed:\n{first.stderr[-2000:]}"
+
+    with sqlite3.connect(db_path) as conn:
+        names = {r[0] for r in conn.execute(
+            "SELECT name FROM sqlite_master WHERE type='table'")}
+    assert "users" in names
+    assert "alembic_version" in names, "a fresh database should be stamped at head"
+
+    # The call that used to fail: --reset against an already-stamped database.
+    second = run_seed("C")
+    assert second.returncode == 0, (
+        "re-seeding a stamped database failed -- alembic_version most likely "
+        f"survived the reset:\n{second.stderr[-2000:]}")
+
+    with sqlite3.connect(db_path) as conn:
+        names = {r[0] for r in conn.execute(
+            "SELECT name FROM sqlite_master WHERE type='table'")}
+        assert "users" in names, "reset must leave a usable schema behind"
+        n = conn.execute("SELECT count(*) FROM users").fetchone()[0]
+    assert n > 0, "the demo users must exist after a re-seed"
