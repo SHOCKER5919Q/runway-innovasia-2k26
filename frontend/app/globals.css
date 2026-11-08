@@ -1,0 +1,495 @@
+@import 'tailwindcss';
+@import 'tw-animate-css';
+
+/*
+ * RUNWAY design system
+ * --------------------
+ * Derived from Reference/"RUNWAY Financial Copilot UI Board.png": a deep
+ * navy-indigo obsidian base (#070916 page, #0F1322 cards) with a single
+ * violet accent and a strict semantic set for financial direction.
+ *
+ * Rules this system enforces:
+ *   - Violet is for interaction and the product's own voice. It is never
+ *     used to mean "good".
+ *   - Gain/loss/warn are the only colours that carry financial meaning, and
+ *     they are always paired with a glyph or a sign so colour is never the
+ *     sole channel (WCAG 1.4.1).
+ *   - Each of the three states has its own hue AND its own line treatment:
+ *     actual is solid, predicted is a band, simulated is dashed.
+ */
+
+/*
+ * RUNWAY design system — implements /DESIGN.md (Linear structure, lime accent).
+ *
+ * Hierarchy is the four-step surface ladder plus 1px hairlines, not shadow.
+ * The accent is used on brand, CTA and focus only, and never means "good".
+ * Semantic colours carry financial meaning only and always ship with a glyph.
+ */
+
+/*
+ * RUNWAY design system — implements /DESIGN.md (Linear structure, lime accent).
+ *
+ * Hierarchy is the four-step surface ladder plus 1px hairlines, not shadow.
+ * The accent is brand, CTA and focus only, and never means "good".
+ * Semantic colours carry financial meaning only and always ship with a glyph
+ * or a sign, so colour is never the sole channel (WCAG 1.4.1).
+ */
+
+@custom-variant dark (&:is(.dark *));
+
+:root {
+  /* Native UI (scrollbars, the date picker, select popups) follows the
+     theme only if the browser is told which one is in play. */
+  color-scheme: dark;
+
+  /* canvas + four-step ladder */
+  --background: #06100B;
+  --foreground: #F4F8F5;
+
+  --card: #0F1613;
+  --card-foreground: #F4F8F5;
+  --popover: #19241F;
+  --popover-foreground: #F4F8F5;
+
+  /* brand / interaction only */
+  --primary: #C6F54A;
+  --primary-foreground: #0D1A10;
+  --primary-soft: rgba(198, 245, 74, 0.13);
+  --primary-ring: rgba(198, 245, 74, 0.42);
+
+  --secondary: #141D19;
+  --secondary-foreground: #CBD6CE;
+  --muted: #141D19;
+  --muted-foreground: #8A978E;
+  --accent: #19241F;
+  --accent-foreground: #F4F8F5;
+
+  --destructive: #FF6B7A;
+  --destructive-foreground: #0D1A10;
+
+  --border: #1E2A24;
+  --border-strong: #2B3A32;
+  --input: #19241F;
+  --ring: #C6F54A;
+
+  /* semantic — financial meaning only, never decoration */
+  --fin-gain: #34E7B0;
+  --fin-gain-soft: rgba(52, 231, 176, 0.14);
+  --fin-loss: #FF6B7A;
+  --fin-loss-soft: rgba(255, 107, 122, 0.14);
+  --fin-warn: #F5C45E;
+  --fin-warn-soft: rgba(245, 196, 94, 0.14);
+  --fin-info: #6FC8F5;
+  --fin-info-soft: rgba(111, 200, 245, 0.14);
+  --fin-neutral: #8A978E;
+
+  /* the three states — a hue AND a line treatment each */
+  --state-actual: #6FC8F5;
+  --state-predicted: #C6F54A;
+  --state-simulated: #F5C45E;
+  --state-actual-soft: rgba(111, 200, 245, 0.16);
+  --state-predicted-soft: rgba(198, 245, 74, 0.16);
+  --state-simulated-soft: rgba(245, 196, 94, 0.16);
+
+  --chart-1: #C6F54A;
+  --chart-2: #34E7B0;
+  --chart-3: #6FC8F5;
+  --chart-4: #F5C45E;
+  --chart-5: #FF6B7A;
+  --chart-6: #64706A;
+  --chart-grid: #1E2A24;
+  --chart-tick: #8A978E;
+
+  --surface: #141D19;
+  --surface-hover: #19241F;
+  --sidebar: #0B1410;
+  --sidebar-foreground: #E6EEE9;
+  --sidebar-primary: #C6F54A;
+  --sidebar-primary-foreground: #0D1A10;
+  --sidebar-accent: #19241F;
+  --sidebar-accent-foreground: #F4F8F5;
+  --sidebar-border: #1E2A24;
+  --sidebar-ring: #C6F54A;
+
+  /* Linear's scale: 8px buttons, 12px cards, 16px product panels. */
+  --radius: 0.75rem;
+
+  /* Depth is the ladder and the hairline. The one concession is a faint
+     top-edge highlight on a lifted panel. */
+  --shadow-card: 0 1px 0 0 rgba(255, 255, 255, 0.035) inset;
+  --shadow-float: 0 1px 0 0 rgba(255, 255, 255, 0.05) inset,
+                  0 18px 48px -32px rgba(0, 0, 0, 0.9);
+  --glow-primary: 0 0 0 1px rgba(198, 245, 74, 0.28);
+}
+
+/* Light mode is a first-class theme, not an afterthought: accountants work
+   in daylight on projectors where the dark theme washes out. */
+:root[data-theme='light'] {
+  color-scheme: light;
+  --background: #FBFCFB;
+  --foreground: #16211B;
+  --card: #FFFFFF;
+  --card-foreground: #16211B;
+  --popover: #FFFFFF;
+  --popover-foreground: #16211B;
+  --primary: #4E7F18;
+  --primary-foreground: #FFFFFF;
+  --primary-soft: rgba(78, 127, 24, 0.10);
+  --secondary: #F2F5F3;
+  --secondary-foreground: #2A3831;
+  --muted: #EEF2EF;
+  --muted-foreground: #5C6B63;
+  --accent: #E9F0EB;
+  --accent-foreground: #1B2821;
+  --border: #DEE6E1;
+  --border-strong: #C6D2CB;
+  --input: #E6ECE8;
+  --surface: #F6F9F7;
+  --surface-hover: #EDF2EF;
+  --sidebar: #F6F9F7;
+  --sidebar-foreground: #233029;
+  --sidebar-accent: #E4EDE7;
+  --sidebar-border: #DEE6E1;
+  --fin-gain: #0E8F68;
+  --fin-loss: #C4374A;
+  --fin-warn: #9A6B06;
+  --fin-info: #1C6E9B;
+  --state-actual: #1C6E9B;
+  --state-predicted: #4E7F18;
+  --state-simulated: #9A6B06;
+  --chart-grid: #DEE6E1;
+  --chart-tick: #5C6B63;
+  --shadow-card: 0 1px 2px -1px rgba(0, 0, 0, 0.06);
+  --shadow-float: 0 14px 40px -24px rgba(0, 0, 0, 0.18);
+}
+
+@theme inline {
+  --font-sans: var(--font-geist-sans), 'Inter', system-ui, sans-serif;
+  --font-display: var(--font-display), 'Inter', system-ui, sans-serif;
+  --font-mono: var(--font-geist-mono), 'JetBrains Mono', ui-monospace, monospace;
+
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-primary-soft: var(--primary-soft);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-destructive-foreground: var(--destructive-foreground);
+  --color-border: var(--border);
+  --color-border-strong: var(--border-strong);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+  --color-surface: var(--surface);
+  --color-surface-hover: var(--surface-hover);
+
+  --color-fin-gain: var(--fin-gain);
+  --color-fin-gain-soft: var(--fin-gain-soft);
+  --color-fin-loss: var(--fin-loss);
+  --color-fin-loss-soft: var(--fin-loss-soft);
+  --color-fin-warn: var(--fin-warn);
+  --color-fin-warn-soft: var(--fin-warn-soft);
+  --color-fin-info: var(--fin-info);
+  --color-fin-info-soft: var(--fin-info-soft);
+  --color-fin-neutral: var(--fin-neutral);
+
+  --color-state-actual: var(--state-actual);
+  --color-state-predicted: var(--state-predicted);
+  --color-state-simulated: var(--state-simulated);
+  --color-state-actual-soft: var(--state-actual-soft);
+  --color-state-predicted-soft: var(--state-predicted-soft);
+  --color-state-simulated-soft: var(--state-simulated-soft);
+
+  --color-chart-1: var(--chart-1);
+  --color-chart-2: var(--chart-2);
+  --color-chart-3: var(--chart-3);
+  --color-chart-4: var(--chart-4);
+  --color-chart-5: var(--chart-5);
+  --color-chart-6: var(--chart-6);
+
+  --color-sidebar: var(--sidebar);
+  --color-sidebar-foreground: var(--sidebar-foreground);
+  --color-sidebar-primary: var(--sidebar-primary);
+  --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
+  --color-sidebar-accent: var(--sidebar-accent);
+  --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
+  --color-sidebar-border: var(--sidebar-border);
+  --color-sidebar-ring: var(--sidebar-ring);
+
+  /* DESIGN.md shape scale */
+  --radius-xs: 4px;    /* chips, status badges */
+  --radius-sm: 6px;    /* inline tags */
+  --radius-md: 8px;    /* buttons, inputs */
+  --radius-lg: 12px;   /* cards */
+  --radius-xl: 16px;   /* product panels */
+  --radius-2xl: 24px;  /* oversized CTA banners, rare */
+}
+
+@layer base {
+  * { @apply border-border; }
+  html { -webkit-text-size-adjust: 100%; scroll-behavior: auto; }
+  body {
+    @apply bg-background text-foreground font-sans antialiased;
+    font-feature-settings: 'cv11', 'ss01';
+    text-rendering: optimizeLegibility;
+  }
+  /* Tabular numerals everywhere a number can change: otherwise every
+     refresh makes the layout twitch, which reads as instability in a
+     product whose entire job is to look trustworthy. */
+  .tnum, td, th, .font-mono { font-variant-numeric: tabular-nums; }
+  :focus-visible {
+    outline: 2px solid var(--ring);
+    outline-offset: 2px;
+    border-radius: 4px;
+  }
+  ::selection { background: var(--primary-soft); color: var(--foreground); }
+  ::-webkit-scrollbar { width: 10px; height: 10px; }
+  ::-webkit-scrollbar-track { background: transparent; }
+  ::-webkit-scrollbar-thumb {
+    background: var(--border-strong); border-radius: 8px;
+    border: 3px solid transparent; background-clip: content-box;
+  }
+  ::-webkit-scrollbar-thumb:hover { background: var(--muted-foreground); background-clip: content-box; }
+}
+
+@layer components {
+  .rw-card {
+    @apply rounded-lg border border-border bg-card;
+    box-shadow: var(--shadow-card);
+  }
+  .rw-surface { @apply rounded-lg border border-border bg-surface; }
+  .rw-grid-bg {
+    background-image:
+      linear-gradient(to right, var(--border) 1px, transparent 1px),
+      linear-gradient(to bottom, var(--border) 1px, transparent 1px);
+    background-size: 56px 56px;
+    mask-image: radial-gradient(ellipse 80% 60% at 50% 0%, #000 40%, transparent 100%);
+    opacity: 0.35;
+  }
+  .rw-aurora {
+    background:
+      radial-gradient(62rem 38rem at 10% -10%, rgba(198, 245, 74, 0.11), transparent 62%),
+      radial-gradient(54rem 34rem at 92% 2%, rgba(52, 231, 176, 0.10), transparent 60%),
+      radial-gradient(46rem 30rem at 50% 110%, rgba(111, 200, 245, 0.07), transparent 60%);
+  }
+  .rw-hairline { @apply border-t border-border; }
+  .rw-chip {
+    @apply inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1
+           text-[11px] font-medium leading-none;
+  }
+  .rw-kbd {
+    @apply inline-flex h-5 min-w-5 items-center justify-center rounded border
+           border-border bg-surface px-1.5 font-mono text-[10px] text-muted-foreground;
+  }
+}
+
+@layer utilities {
+  .text-balance { text-wrap: balance; }
+  .text-pretty { text-wrap: pretty; }
+  .rw-shimmer {
+    background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.055), transparent);
+    background-size: 220% 100%;
+    animation: rw-shimmer 1.6s ease-in-out infinite;
+  }
+  @keyframes rw-shimmer {
+    0% { background-position: 180% 0; }
+    100% { background-position: -80% 0; }
+  }
+  .rw-rise { animation: rw-rise 0.5s cubic-bezier(0.16, 1, 0.3, 1) both; }
+  @keyframes rw-rise {
+    from { opacity: 0; transform: translateY(10px); }
+    to { opacity: 1; transform: none; }
+  }
+  .rw-dash-sim { stroke-dasharray: 6 4; }
+}
+
+/* Respect the user's motion preference everywhere, including Lenis and GSAP
+   (both are disabled in JS when this matches). */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+/* ── marketing-surface keyframes ───────────────────────────────────
+   Scoped to the landing page; none of these run inside the app. */
+@keyframes rw-marquee {
+  from { transform: translateX(0); }
+  to   { transform: translateX(-100%); }
+}
+
+@keyframes rw-beam {
+  0%, 100% { opacity: 0; transform: translateY(-100%); }
+  50%      { opacity: 0.5; transform: translateY(100%); }
+}
+
+@keyframes rw-float {
+  0%, 100% { transform: translateY(0); }
+  50%      { transform: translateY(-10px); }
+}
+
+@keyframes rw-gradient-pan {
+  from { background-position: 0% 50%; }
+  to   { background-position: 100% 50%; }
+}
+
+@keyframes rw-pulse-ring {
+  0%   { box-shadow: 0 0 0 0 rgba(198, 245, 74, 0.35); }
+  70%  { box-shadow: 0 0 0 14px rgba(198, 245, 74, 0); }
+  100% { box-shadow: 0 0 0 0 rgba(198, 245, 74, 0); }
+}
+
+@layer utilities {
+  .rw-float { animation: rw-float 6s ease-in-out infinite; }
+  .rw-ring  { animation: rw-pulse-ring 2.6s ease-out infinite; }
+  /* Only for plain text. background-clip cannot survive SplitText's
+     per-character spans — those take a solid accent colour instead. */
+  .rw-text-gradient {
+    background-image: linear-gradient(100deg,
+      var(--primary) 0%, var(--fin-gain) 38%,
+      var(--state-actual) 66%, var(--primary) 100%);
+    background-size: 200% 100%;
+    -webkit-background-clip: text;
+    background-clip: text;
+    color: transparent;
+    -webkit-text-fill-color: transparent;
+    animation: rw-gradient-pan 9s ease-in-out infinite alternate;
+  }
+  .rw-noise::after {
+    content: ""; position: absolute; inset: 0; pointer-events: none;
+    opacity: 0.030; mix-blend-mode: overlay;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='140' height='140'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='3'/%3E%3C/filter%3E%3Crect width='140' height='140' filter='url(%23n)'/%3E%3C/svg%3E");
+  }
+}
+
+/* ═══════════════════════════════════════════════════════════════════
+   Premium layer — the chrome that makes the whole site feel built
+   rather than assembled. Everything here degrades to nothing under
+   prefers-reduced-motion, and none of it is load-bearing: strip the
+   block and every screen still reads correctly.
+   ═══════════════════════════════════════════════════════════════════ */
+
+/* ── 1. the screen cascade ──────────────────────────────────────────
+   Every application screen is a wrapper holding a header, some stat
+   grids and some panels. Fading the wrapper as one block is cheap and
+   reads cheap. Cascading its children costs nothing extra and makes a
+   screen assemble itself. Done in CSS keyed on nth-child so all twenty
+   screens inherit it without a line of per-page code. */
+@media (prefers-reduced-motion: no-preference) {
+  .rw-stage > * > * {
+    animation: rw-cascade 0.52s cubic-bezier(0.16, 1, 0.3, 1) both;
+  }
+  .rw-stage > * > *:nth-child(1)  { animation-delay: 0.00s }
+  .rw-stage > * > *:nth-child(2)  { animation-delay: 0.045s }
+  .rw-stage > * > *:nth-child(3)  { animation-delay: 0.09s }
+  .rw-stage > * > *:nth-child(4)  { animation-delay: 0.13s }
+  .rw-stage > * > *:nth-child(5)  { animation-delay: 0.165s }
+  .rw-stage > * > *:nth-child(6)  { animation-delay: 0.195s }
+  .rw-stage > * > *:nth-child(7)  { animation-delay: 0.22s }
+  .rw-stage > * > *:nth-child(8)  { animation-delay: 0.24s }
+  /* the tail flattens — a visitor should never wait on decoration */
+  .rw-stage > * > *:nth-child(n+9) { animation-delay: 0.255s }
+}
+@keyframes rw-cascade {
+  from { opacity: 0; transform: translate3d(0, 10px, 0); }
+  to   { opacity: 1; transform: none; }
+}
+
+/* ── 2. route progress ─────────────────────────────────────────────
+   A navigation that recomputes a forecast is not instant. Saying so is
+   better than a frozen screen. */
+@keyframes rw-route-progress {
+  0%   { transform: scaleX(0);    opacity: 1 }
+  60%  { transform: scaleX(0.72); opacity: 1 }
+  100% { transform: scaleX(1);    opacity: 0 }
+}
+.rw-route-bar {
+  position: fixed; inset-inline: 0; top: 0; height: 2px; z-index: 60;
+  transform-origin: 0 50%;
+  background: linear-gradient(90deg,
+    transparent, var(--state-actual), var(--primary) 70%, var(--primary));
+  box-shadow: 0 0 12px -2px var(--primary);
+  animation: rw-route-progress 0.9s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+@media (prefers-reduced-motion: reduce) { .rw-route-bar { display: none } }
+
+/* ── 3. scrollbars ─────────────────────────────────────────────────
+   The default scrollbar is the one piece of chrome that gives away an
+   unfinished build on a dark page. */
+* { scrollbar-width: thin; scrollbar-color: var(--border-strong) transparent; }
+*::-webkit-scrollbar { width: 10px; height: 10px; }
+*::-webkit-scrollbar-track { background: transparent; }
+*::-webkit-scrollbar-thumb {
+  background: var(--border-strong);
+  border: 3px solid transparent;
+  border-radius: 999px;
+  background-clip: padding-box;
+}
+*::-webkit-scrollbar-thumb:hover { background: var(--muted-foreground); background-clip: padding-box; }
+*::-webkit-scrollbar-corner { background: transparent; }
+
+/* ── 4. selection and focus ────────────────────────────────────────── */
+::selection { background: color-mix(in oklab, var(--primary) 28%, transparent); color: var(--foreground); }
+:focus-visible { outline: 2px solid color-mix(in oklab, var(--primary) 60%, transparent); outline-offset: 2px; }
+
+/* ── 5. a hairline that actually looks drawn ───────────────────────
+   A flat 1px border meets the page edge and stops dead. Fading both
+   ends is what separates a designed rule from a default one. */
+.rw-hairline {
+  height: 1px; border: 0;
+  background: linear-gradient(90deg, transparent, var(--border-strong) 18%,
+                              var(--border-strong) 82%, transparent);
+}
+
+/* ── 6. the chapter rail (landing) ───────────────────────────────── */
+.rw-rail-dot {
+  position: relative; display: block; height: 7px; width: 7px;
+  border-radius: 999px; background: var(--border-strong);
+  transition: background-color 0.35s ease, transform 0.35s cubic-bezier(0.16, 1, 0.3, 1);
+}
+.rw-rail-dot[data-on="true"] { background: var(--primary); transform: scale(1.5); }
+.rw-rail-dot[data-on="true"]::after {
+  content: ""; position: absolute; inset: -5px; border-radius: 999px;
+  border: 1px solid color-mix(in oklab, var(--primary) 45%, transparent);
+}
+
+/* ── 7. the intro curtain ────────────────────────────────────────── */
+@keyframes rw-curtain-lift {
+  0%   { clip-path: inset(0 0 0 0);     opacity: 1 }
+  100% { clip-path: inset(0 0 100% 0);  opacity: 1 }
+}
+@keyframes rw-curtain-mark { 0% { opacity: 0; transform: translateY(8px) } 100% { opacity: 1; transform: none } }
+@keyframes rw-curtain-sweep { from { transform: translateX(-100%) } to { transform: none } }
+
+/* ── 8. print ──────────────────────────────────────────────────────
+   A shared passport gets printed and put in a credit file. On paper the
+   dark theme is a toner crime, so force the light ladder and drop every
+   piece of chrome that only makes sense on screen. */
+@media print {
+  :root {
+    color-scheme: light;
+    --background: #ffffff; --foreground: #111827;
+    --card: #ffffff; --surface: #ffffff;
+    --border: #d4d4d8; --border-strong: #a1a1aa;
+    --muted-foreground: #52525b;
+  }
+  html, body { background: #fff !important; }
+  .rw-noise::after, .rw-route-bar, .rw-rail-dot { display: none !important; }
+  nav[aria-label="Page sections"] { display: none !important; }
+  .rw-card { box-shadow: none !important; border-color: #d4d4d8 !important; }
+  .rw-stage > * > * { animation: none !important; opacity: 1 !important; transform: none !important; }
+  .break-inside-avoid { break-inside: avoid; page-break-inside: avoid; }
+  a[href]::after { content: "" }  /* no URL noise after every link */
+}

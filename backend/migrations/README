@@ -1,0 +1,11 @@
+Alembic migrations for RUNWAY.
+
+The database URL is read from RUNWAY_DATABASE_URL via app.core.config, so
+migrations always target the same database the application uses.
+
+    ../run.sh migrate              upgrade to head
+    ../run.sh migrate-status       show current and head revisions
+    ../run.sh migrate-new "msg"    autogenerate a new revision
+
+SQLite runs in batch mode automatically (see env.py) so the same revision
+scripts work on both SQLite and PostgreSQL.

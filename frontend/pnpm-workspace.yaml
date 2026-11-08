@@ -1,0 +1,8 @@
+allowBuilds:
+  esbuild: set this to true or false
+  sharp: set this to true or false
+# pnpm >= 10 reads build-script approvals from here, not package.json.
+# sharp is pulled in by Next for image optimisation, which this app does not
+# use (images.unoptimized = true); approving it just stops `pnpm dev` failing.
+onlyBuiltDependencies:
+  - sharp

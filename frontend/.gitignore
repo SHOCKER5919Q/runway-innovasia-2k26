@@ -1,0 +1,3 @@
+
+# headless-browser profiles (unix sockets break Turbopack css scan)
+.taste-skill/

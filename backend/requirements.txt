@@ -1,0 +1,38 @@
+# RUNWAY backend dependencies.
+#
+# numpy / pandas / scipy / scikit-learn are expected from the system or a
+# wheel; the venv is created with --system-site-packages so a distro build
+# is reused where one exists.
+
+# --- web framework ---
+fastapi>=0.115
+uvicorn[standard]>=0.30
+python-multipart>=0.0.9
+pydantic>=2.7
+pydantic-settings>=2.3
+email-validator>=2.1
+httpx>=0.27
+
+# --- persistence ---
+SQLAlchemy>=2.0
+alembic>=1.13
+# PostgreSQL driver. Optional - the default database is SQLite. Install it
+# when RUNWAY_DATABASE_URL points at postgresql+psycopg://...
+psycopg[binary]>=3.1
+
+# --- security ---
+PyJWT>=2.8
+
+# --- document import ---
+# Text-layer PDF invoices. Scanned PDFs additionally need the tesseract-ocr
+# and poppler-utils system packages; RUNWAY says so rather than failing.
+pypdf>=5.0
+
+# --- quantitative stack ---
+numpy>=1.26
+pandas>=2.1
+scipy>=1.11
+scikit-learn>=1.4
+
+# --- testing ---
+pytest>=8.0

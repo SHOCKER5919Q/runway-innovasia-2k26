@@ -1,0 +1,28 @@
+# python
+backend/.venv/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+
+# node
+frontend/node_modules/
+frontend/.next/
+frontend/out/
+frontend/tsconfig.tsbuildinfo
+
+# data & secrets
+data/*.db
+data/*.db-wal
+data/*.db-shm
+backend/.env
+frontend/.env.local
+*.log
+
+# os
+.DS_Store
+
+# headless-browser profiles (unix sockets break Turbopack css scan)
+.taste-skill/
+
+# generated verification screenshots (regenerable, ~5MB)
+frontend/shots/
