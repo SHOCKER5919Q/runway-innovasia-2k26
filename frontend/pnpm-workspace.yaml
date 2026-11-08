@@ -1,8 +1,17 @@
 allowBuilds:
   esbuild: set this to true or false
-  sharp: set this to true or false
-# pnpm >= 10 reads build-script approvals from here, not package.json.
-# sharp is pulled in by Next for image optimisation, which this app does not
-# use (images.unoptimized = true); approving it just stops `pnpm dev` failing.
+# pnpm 10+ blocks dependency build scripts unless they are approved, and by
+# default exits 1 (ERR_PNPM_IGNORED_BUILDS) when any were skipped. That turned
+# a fresh `./run.sh setup` into a hard failure on an otherwise healthy install.
+#
+# sharp is approved because it fetches the libvips bindings next/image uses.
+# esbuild arrives transitively via Vitest; on Linux its real binary ships in
+# the @esbuild/linux-x64 optional package, so its own postinstall is a no-op
+# and the 95 frontend tests pass with it skipped.
+#
+# strictDepBuilds: false keeps a skipped build a warning rather than a failed
+# install, so setup completes on a machine where a build script cannot run.
 onlyBuiltDependencies:
   - sharp
+  - esbuild
+strictDepBuilds: false

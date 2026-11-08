@@ -45,7 +45,10 @@ setup() {
   ok "python dependencies installed"
 
   if command -v pnpm >/dev/null 2>&1; then PKG=pnpm; else need npm; PKG=npm; fi
-  (cd "$FRONTEND" && $PKG install --silent)
+  # Not --silent. pnpm 10+ exits 1 when it skips a dependency build script,
+  # and --silent swallowed the reason entirely: setup died after the Python
+  # step with no message at all. An installer that fails must say why.
+  (cd "$FRONTEND" && $PKG install) || die "$PKG install failed in frontend/ (see the output above)"
   ok "web dependencies installed ($PKG)"
 
   seed "${1:-B}"

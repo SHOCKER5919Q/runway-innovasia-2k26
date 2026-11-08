@@ -2,7 +2,7 @@
   "name": "runway-frontend",
   "version": "0.9.0",
   "private": true,
-  "description": "RUNWAY — the web application for the Financial Intelligence OS for Indian MSMEs.",
+  "description": "RUNWAY \u2014 the web application for the Financial Intelligence OS for Indian MSMEs.",
   "scripts": {
     "dev": "next dev -p 3000",
     "build": "next build",
