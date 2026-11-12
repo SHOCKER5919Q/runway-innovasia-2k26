@@ -4,17 +4,18 @@ import { useState } from "react";
 import { Activity, Gauge, Info, Shuffle, TrendingDown } from "lucide-react";
 import { BreachBars, CashBandChart, FlowBars } from "@/components/runway/charts";
 import {
-  Delta, ErrorState, Evidence, LoadingPanel, Panel, Provenance, SectionHeader, Stat, StateBadge,
+  ErrorState, Evidence, LoadingPanel, Panel, Stat, StateBadge,
 } from "@/components/runway/primitives";
-import { Reveal } from "@/components/runway/motion";
+import {
+  Details, ExportButton, Note, PageHeader, Rows, Tabs, useTabs,
+} from "@/components/runway/page-kit";
 import { useApi } from "@/lib/use-api";
 import { inr, pct, shortDate, weeks } from "@/lib/format";
 import { cn } from "@/lib/utils";
 
 export default function ForecastsPage() {
   const { data, loading, error, reload } = useApi<any>("/api/states/predicted");
-  const risk = useApi<any>("/api/risk");
-  const [show, setShow] = useState<"cash" | "flows">("cash");
+  const [show, setShow] = useTabs("forecasts", "cash");
 
   if (error) return <ErrorState message={error} onRetry={reload} />;
   if (loading || !data?.series) return <LoadingPanel rows={8} />;
@@ -23,10 +24,10 @@ export default function ForecastsPage() {
 
   return (
     <div className="space-y-5">
-      <SectionHeader
-        title="Cash Runway"
-        description="A 13-week projection assembled from the invoices and obligations already on file, then simulated thousands of times to show the range rather than a single number."
-        actions={<StateBadge state="predicted" size="md" />} />
+      <PageHeader
+        title="Cash runway"
+        subtitle="Assembled from the invoices and obligations already on file, then simulated to show the range rather than a single number."
+        state={<StateBadge state="predicted" size="md" />} />
 
       <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-5">
         <Stat label="Runway P50" value={weeks(s.runway_weeks_p50)} state="predicted"
@@ -42,16 +43,10 @@ export default function ForecastsPage() {
               sub={s.first_breach_week ? `first in week ${s.first_breach_week}` : "no breach in the median path"} />
       </div>
 
-      <div className="flex gap-2">
-        {(["cash", "flows"] as const).map((v) => (
-          <button key={v} onClick={() => setShow(v)}
-            className={cn("rounded-lg border px-3 py-1.5 text-xs capitalize",
-              show === v ? "border-primary bg-primary-soft text-primary"
-                         : "border-border text-muted-foreground hover:bg-surface-hover")}>
-            {v === "cash" ? "Cash position" : "Inflow vs outflow"}
-          </button>
-        ))}
-      </div>
+      <Tabs active={show} onChange={(k) => setShow(k as any)} tabs={[
+        { key: "cash", label: "Cash position" },
+        { key: "flows", label: "Inflow vs outflow" },
+      ]} />
 
       <Panel
         title={show === "cash" ? "Projected cash position" : "Expected movement by week"}
@@ -76,7 +71,7 @@ export default function ForecastsPage() {
                   tone={s.negative_cash_probability > 0.1 ? "loss" : "neutral"} />
           </div>
           <div className="px-2 pb-1">
-            <Provenance>{a.var_definition}</Provenance>
+            <Note>{a.var_definition}</Note>
           </div>
         </Panel>
 
@@ -132,6 +127,8 @@ export default function ForecastsPage() {
             { label: "Paths", value: s.paths.toLocaleString("en-IN") },
             { label: "Seed", value: String(s.seed) },
             { label: "Delay correlation ρ", value: String(a.delay_correlation_rho ?? "—") },
+            ...(a.revenue_delay_coupling
+              ? [{ label: "Revenue/delay coupling", value: String(a.revenue_delay_coupling) }] : []),
             { label: "Correlation source", value: a.delay_correlation_source ?? "—" },
             { label: "Revenue CV", value: String(a.revenue_cv ?? "—") },
             { label: "Collection lag (median)", value: `${a.collection_lag_days_median ?? "—"} days` },
@@ -140,12 +137,30 @@ export default function ForecastsPage() {
             { label: "Revenue run-rate method", value: a.revenue_runrate?.method ?? "—" },
             { label: "Operating cost basis", value: a.recurring_opex?.method ?? "—" },
           ]} dense />
+          <div className="mt-3 space-y-2">
+            {a.revenue_delay_coupling_note && (
+              <Details label="Why demand and payment speed are linked" dense>
+                {a.revenue_delay_coupling_note}
+              </Details>
+            )}
+            {a.horizon_truncation_note && (
+              <Details label="Reading a revenue shock" dense>
+                {a.horizon_truncation_note}
+              </Details>
+            )}
+            {a.quantile_convention && (
+              <Details label="What P10 and P90 mean" dense>{a.quantile_convention}</Details>
+            )}
+          </div>
           {a.beyond_horizon_paise && (
-            <Provenance>{a.beyond_horizon_paise.note} Receivables{" "}
-              {inr(a.beyond_horizon_paise.receivables)}, future sales{" "}
-              {inr(a.beyond_horizon_paise.sales_not_yet_invoiced)}, payables{" "}
-              {inr(a.beyond_horizon_paise.payables)}.
-            </Provenance>
+            <div className="mt-3">
+              <Details label="What falls outside the 13-week window" dense>
+                {a.beyond_horizon_paise.note} Receivables{" "}
+                {inr(a.beyond_horizon_paise.receivables)}, future sales{" "}
+                {inr(a.beyond_horizon_paise.sales_not_yet_invoiced)}, payables{" "}
+                {inr(a.beyond_horizon_paise.payables)}.
+              </Details>
+            </div>
           )}
           {a.payment_delay_model && (
             <div className="mt-3 rounded-lg border border-border bg-surface p-3">

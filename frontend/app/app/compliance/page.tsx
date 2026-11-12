@@ -4,6 +4,7 @@ import { CalendarDays, Scale, ShieldAlert } from "lucide-react";
 import {
   ErrorState, Evidence, LoadingPanel, Panel, Provenance, SectionHeader, Stat, StateBadge,
 } from "@/components/runway/primitives";
+import { Details, Note, PageHeader } from "@/components/runway/page-kit";
 import { useApi } from "@/lib/use-api";
 import { inr, longDate, money, pct, relDays, shortDate, titleCase } from "@/lib/format";
 import { cn } from "@/lib/utils";
@@ -23,10 +24,10 @@ export default function CompliancePage() {
 
   return (
     <div className="space-y-5">
-      <SectionHeader
-        title="Compliance Calendar"
-        description="Statutory and contractual deadlines from your own ledger, with the money needed to meet them."
-        actions={<StateBadge state="actual" />} />
+      <PageHeader
+        title="Compliance calendar"
+        subtitle="Statutory and contractual deadlines from your own ledger, with the money needed to meet them."
+        state={<StateBadge state="actual" />} />
 
       <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
         <Stat label="Due in 95 days" value={inr(cal.total_upcoming_paise)} state="actual" />
@@ -105,7 +106,11 @@ export default function CompliancePage() {
           </div>
         ))}
         <div className="px-4 py-3">
-          <Provenance>{cal.note}</Provenance>
+          <div className="mt-3">
+            <Details label="How this is calculated">
+              {cal.note}
+            </Details>
+          </div>
         </div>
       </Panel>
 
@@ -121,10 +126,12 @@ export default function CompliancePage() {
             { label: "With overdraft", value: `${cov.with_overdraft_ratio?.toFixed(2)}×` },
             { label: "Shortfall", value: cov.shortfall_paise ? inr(cov.shortfall_paise) : "none" },
           ]} dense />
-          <Provenance>
-            Expected collections are {cov.expected_collections_basis}. The cash-only ratio
+          <div className="mt-3">
+            <Details label="How this is calculated">
+              Expected collections are {cov.expected_collections_basis}. The cash-only ratio
             is the pessimistic read: it assumes nothing arrives at all.
-          </Provenance>
+            </Details>
+          </div>
         </Panel>
 
         <Panel title="Rules RUNWAY applies"

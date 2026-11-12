@@ -5,11 +5,15 @@ import {
   AlertTriangle, ChevronLeft, ChevronRight, Filter, Loader2, Search, X,
 } from "lucide-react";
 import {
-  ErrorState, Evidence, LoadingPanel, Panel, Provenance, SectionHeader, Stat, StateBadge,
+  ErrorState, Evidence, LoadingPanel, Panel, StateBadge,
 } from "@/components/runway/primitives";
+import {
+  Button, Details, ExportButton, Field, Modal, Note, PageHeader, Select, Rows,
+  inputCls,
+} from "@/components/runway/page-kit";
 import { api } from "@/lib/api";
 import { useApi } from "@/lib/use-api";
-import { inr, longDate, shortDate, titleCase } from "@/lib/format";
+import { longDate, shortDate, titleCase } from "@/lib/format";
 import { cn } from "@/lib/utils";
 
 const RECON_LABEL: Record<string, { label: string; cls: string }> = {
@@ -31,6 +35,7 @@ export default function TransactionsPage() {
   const [needsReview, setNeedsReview] = useState(false);
   const [sort, setSort] = useState("date_desc");
   const [openId, setOpenId] = useState<string | null>(null);
+  const [newOpen, setNewOpen] = useState(false);
 
   useEffect(() => {
     const t = setTimeout(() => { setDebounced(q); setPage(1); }, 300);
@@ -48,6 +53,13 @@ export default function TransactionsPage() {
   }, [page, debounced, category, recon, direction, needsReview, sort]);
 
   const { data, loading, error, reload } = useApi<any>(`/api/transactions?${qs}`, [qs]);
+  const exportQs = useMemo(() => {
+    const p = new URLSearchParams();
+    if (debounced) p.set("q", debounced);
+    if (category) p.set("category", category);
+    if (direction) p.set("direction", direction);
+    return p.toString() ? `?${p}` : "";
+  }, [debounced, category, direction]);
   const detail = useApi<any>(openId ? `/api/transactions/${openId}` : null, [openId]);
 
   if (error) return <ErrorState message={error} onRetry={reload} />;
@@ -56,10 +68,15 @@ export default function TransactionsPage() {
 
   return (
     <div className="space-y-5">
-      <SectionHeader
+      <PageHeader
         title="Transactions"
-        description="The unified ledger. Every row keeps its original source record and the full chain of transformations applied to it."
-        actions={<StateBadge state="actual" />} />
+        subtitle="Every row keeps its original source record and the full chain of transformations applied to it."
+        state={<StateBadge state="actual" />}
+        actions={<>
+          <ExportButton path={`/api/exports/transactions.csv${exportQs}`}
+                        filename="runway-transactions.csv" label="Export" />
+          <Button tone="primary" onClick={() => setNewOpen(true)}>Add transaction</Button>
+        </>} />
 
       <Panel bodyClass="p-3">
         <div className="flex flex-wrap items-center gap-2">
@@ -69,38 +86,26 @@ export default function TransactionsPage() {
                    placeholder="Search narration or reference…"
                    className="h-9 w-full rounded-lg border border-border bg-surface pl-8 pr-3 text-sm outline-none focus:border-primary/60" />
           </div>
-          <select value={category} onChange={(e) => { setCategory(e.target.value); setPage(1); }}
-                  aria-label="Category"
-                  className="h-9 rounded-lg border border-border bg-surface px-2.5 text-xs outline-none">
-            <option value="">All categories</option>
-            {data?.facets?.categories?.map((c: any) => (
-              <option key={c.value} value={c.value}>{titleCase(c.value)} ({c.count})</option>
-            ))}
-          </select>
-          <select value={recon} onChange={(e) => { setRecon(e.target.value); setPage(1); }}
-                  aria-label="Reconciliation status"
-                  className="h-9 rounded-lg border border-border bg-surface px-2.5 text-xs outline-none">
-            <option value="">All statuses</option>
-            {data?.facets?.recon_status?.map((c: any) => (
-              <option key={c.value} value={c.value}>
-                {RECON_LABEL[c.value]?.label ?? c.value} ({c.count})
-              </option>
-            ))}
-          </select>
-          <select value={direction} onChange={(e) => { setDirection(e.target.value); setPage(1); }}
-                  aria-label="Direction"
-                  className="h-9 rounded-lg border border-border bg-surface px-2.5 text-xs outline-none">
-            <option value="">In and out</option>
-            <option value="credit">Money in</option>
-            <option value="debit">Money out</option>
-          </select>
-          <select value={sort} onChange={(e) => setSort(e.target.value)} aria-label="Sort"
-                  className="h-9 rounded-lg border border-border bg-surface px-2.5 text-xs outline-none">
-            <option value="date_desc">Newest first</option>
-            <option value="date_asc">Oldest first</option>
-            <option value="amount_desc">Largest first</option>
-            <option value="amount_asc">Smallest first</option>
-          </select>
+          <Select value={category}
+                  onChange={(v) => { setCategory(v); setPage(1); }}
+                  options={[{ value: "", label: "All categories" },
+                    ...(data?.facets?.categories ?? []).map((c: any) => ({
+                      value: c.value, label: `${titleCase(c.value)} (${c.count})` }))]} />
+          <Select value={recon}
+                  onChange={(v) => { setRecon(v); setPage(1); }}
+                  options={[{ value: "", label: "All statuses" },
+                    ...(data?.facets?.recon_status ?? []).map((c: any) => ({
+                      value: c.value, label: `${RECON_LABEL[c.value]?.label ?? c.value} (${c.count})` }))]} />
+          <Select value={direction}
+                  onChange={(v) => { setDirection(v); setPage(1); }}
+                  options={[{ value: "", label: "In and out" },
+                            { value: "credit", label: "Money in" },
+                            { value: "debit", label: "Money out" }]} />
+          <Select value={sort} onChange={setSort}
+                  options={[{ value: "date_desc", label: "Newest first" },
+                            { value: "date_asc", label: "Oldest first" },
+                            { value: "amount_desc", label: "Largest first" },
+                            { value: "amount_asc", label: "Smallest first" }]} />
           <button onClick={() => { setNeedsReview((v) => !v); setPage(1); }}
                   aria-pressed={needsReview}
                   className={cn("inline-flex h-9 items-center gap-1.5 rounded-lg border px-3 text-xs",
@@ -268,12 +273,159 @@ export default function TransactionsPage() {
               </ol>
             </div>
           </div>
-          <Provenance>
-            The original imported row is retained verbatim and every normalisation step is
-            logged, so any figure on any screen can be traced back to its source record.
-          </Provenance>
+          <div className="mt-3">
+            <Details label="Provenance chain for this row" dense>
+              The original imported row is retained verbatim and every
+              normalisation step is logged, so any figure on any screen can be
+              traced back to its source record.
+            </Details>
+          </div>
         </Panel>
       )}
+
+      <NewTxnModal open={newOpen} onOpenChange={setNewOpen} onCreated={() => { reload(); setPage(1); }} />
     </div>
+  );
+}
+
+/* ── add a transaction by hand ────────────────────────────────── */
+
+function NewTxnModal({ open, onOpenChange, onCreated }:
+  { open: boolean; onOpenChange: (v: boolean) => void; onCreated: () => void }) {
+  const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState<string | null>(null);
+  const [done, setDone] = useState<any>(null);
+  const [form, setForm] = useState({
+    direction: "debit", amount_rupees: "", narration: "",
+    value_date: new Date().toISOString().slice(0, 10),
+    counterparty_name: "", reference_no: "", category: "", fee_rupees: "",
+  });
+  const set = (k: string, v: string) => setForm((f) => ({ ...f, [k]: v }));
+
+  async function submit(e: React.FormEvent) {
+    e.preventDefault();
+    setBusy(true); setErr(null);
+    try {
+      const r = await api.post<any>("/api/transactions", {
+        direction: form.direction,
+        amount_rupees: Number(form.amount_rupees),
+        narration: form.narration,
+        value_date: form.value_date,
+        counterparty_name: form.counterparty_name || undefined,
+        reference_no: form.reference_no || undefined,
+        category: form.category || undefined,
+        fee_rupees: form.fee_rupees ? Number(form.fee_rupees) : undefined,
+      });
+      setDone(r);
+      onCreated();
+    } catch (e: any) {
+      setErr(e?.message ?? "Could not save the transaction");
+    } finally { setBusy(false); }
+  }
+
+  function close() {
+    onOpenChange(false); setDone(null); setErr(null);
+    setForm((f) => ({ ...f, amount_rupees: "", narration: "", counterparty_name: "",
+                      reference_no: "", fee_rupees: "" }));
+  }
+
+  return (
+    <Modal open={open} onClose={close} title="Add transaction"
+           subtitle="Typed rows go through the same pipeline as an import: duplicate check, counterparty matching, classification and reconciliation.">
+      {done ? (
+        <div className="space-y-3">
+          <div className="rounded-lg border border-fin-gain/30 bg-fin-gain-soft p-3 text-sm">
+            <p className="font-medium">Saved{done.duplicate_of ? " and flagged" : ""}.</p>
+            <p className="mt-0.5 text-xs text-muted-foreground">
+              {titleCase(done.category)} · {done.recon_status.replace(/_/g, " ")}
+              {done.counterparty ? ` · ${done.counterparty.name}` : ""}
+            </p>
+          </div>
+          <Rows items={[
+            { k: "Amount", v: done.amount.display },
+            { k: "Allocated", v: done.allocated.display },
+            { k: "Unallocated", v: done.unallocated.display },
+            { k: "Evidence", v: titleCase(done.evidence) },
+            ...(done.duplicate_of
+              ? [{ k: "Flagged", v: "possible duplicate — review it in the list" }] : []),
+          ]} />
+          <p className="text-[11px] leading-relaxed text-muted-foreground text-pretty">
+            {done.pipeline.reconciliation.note}
+          </p>
+          <div className="flex justify-end"><Button onClick={close}>Done</Button></div>
+        </div>
+      ) : (
+        <form onSubmit={submit} className="space-y-3">
+          <div className="grid gap-3 sm:grid-cols-2">
+            <Field label="Direction">
+              <Select value={form.direction} onChange={(v) => set("direction", v)}
+                      options={[{ value: "debit", label: "Money out" },
+                                { value: "credit", label: "Money in" }]} />
+            </Field>
+            <Field label="Amount (₹)" required>
+              <input type="number" step="0.01" min="0.01" required value={form.amount_rupees}
+                     onChange={(e) => set("amount_rupees", e.target.value)}
+                     placeholder="12500" className={inputCls} />
+            </Field>
+            <Field label="Date" required>
+              <input type="date" required value={form.value_date}
+                     onChange={(e) => set("value_date", e.target.value)} className={inputCls} />
+            </Field>
+            <Field label="Reference" hint="A bank reference makes duplicate detection exact.">
+              <input value={form.reference_no} onChange={(e) => set("reference_no", e.target.value)}
+                     placeholder="NEFT-123456" className={inputCls} />
+            </Field>
+            <div className="sm:col-span-2">
+              <Field label="Narration" required>
+                <input required value={form.narration} onChange={(e) => set("narration", e.target.value)}
+                       placeholder="Paid to Godavari Packaging for cartons" className={inputCls} />
+              </Field>
+            </div>
+            <Field label="Counterparty" hint="Leave blank to let the engine match it from the narration.">
+              <input value={form.counterparty_name}
+                     onChange={(e) => set("counterparty_name", e.target.value)}
+                     placeholder="Godavari Packaging" className={inputCls} />
+            </Field>
+            <Field label="Category" hint="Optional — otherwise it is classified for you.">
+              <Select value={form.category} onChange={(v) => set("category", v)}
+                      options={[{ value: "", label: "Classify automatically" },
+                                { value: "customer_receipt", label: "Customer receipt" },
+                                { value: "supplier_payment", label: "Supplier payment" },
+                                { value: "payroll", label: "Payroll" },
+                                { value: "gst_payment", label: "GST payment" },
+                                { value: "rent", label: "Rent" },
+                                { value: "utilities", label: "Utilities" },
+                                { value: "freight", label: "Freight" },
+                                { value: "bank_charges", label: "Bank charges" },
+                                { value: "other_expense", label: "Other expense" },
+                                { value: "other_income", label: "Other income" }]} />
+            </Field>
+            {form.direction === "credit" && (
+              <Field label="Gateway fee (₹)"
+                     hint="Set this when the bank credited less than the customer paid.">
+                <input type="number" step="0.01" min="0" value={form.fee_rupees}
+                       onChange={(e) => set("fee_rupees", e.target.value)}
+                       placeholder="0" className={inputCls} />
+              </Field>
+            )}
+          </div>
+
+          {err && (
+            <p role="alert" className="rounded-lg border border-fin-loss/30 bg-fin-loss-soft px-3 py-2 text-xs text-fin-loss">
+              {err}
+            </p>
+          )}
+
+          <div className="flex items-center justify-end gap-2 pt-1">
+            <Button type="button" tone="ghost" onClick={close}>Cancel</Button>
+            <Button type="submit" tone="primary" busy={busy}>Save transaction</Button>
+          </div>
+          <Note>
+            A typed row is recorded as an owner estimate. It is promoted to
+            verified only when it is matched against an invoice already on file.
+          </Note>
+        </form>
+      )}
+    </Modal>
   );
 }

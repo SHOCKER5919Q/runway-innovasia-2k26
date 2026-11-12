@@ -1,9 +1,9 @@
 # PROJECT_STATUS
 
-**Last updated:** 7 November 2026
-**Phase:** 7 of 7 — testing and finalisation, complete
-**Build state:** backend **210/210** tests passing on **both SQLite and PostgreSQL** ·
-frontend **75/75** tests passing · production build clean with TypeScript checking on ·
+**Last updated:** 12 November 2026
+**Phase:** 8 of 8 — feature additions, modelling improvement and interface rewrite
+**Build state:** backend **251/251** tests passing ·
+frontend **95/95** tests passing · production build clean with TypeScript checking on ·
 ~5,000 accounting-invariant checks passing · every VARCHAR column audited
 
 This file records what exists, what does not, and every limitation worth knowing.
@@ -105,6 +105,49 @@ RUNWAY_DATABASE_URL="postgresql+psycopg:///runway?host=/run/postgresql" ./run.sh
 - Four industry profiles driving both the generator and the forecaster's priors.
 - Accountant multi-business workspace.
 
+### Phase 8 — additions, modelling and interface rewrite ✅
+
+Four gaps the product openly admitted, closed; and the interface rewritten so it
+reads as a product rather than a demonstration.
+
+**1. Revenue / payment-delay coupling (the top modelling gap).**
+Demand and payment speed were drawn independently, which let a simulated path be
+simultaneously "down 20%" and "everyone paid on time". A shared latent market
+factor now drives both, estimated per business from its own monthly billing
+against mean days-late (`cashflow.estimate_revenue_delay_coupling`, capped at
+0.60, floored at zero). The delay side is one-sided — a strong market does not
+make customers pay early. The factor is drawn from its own random stream, so
+switching the coupling on does not reshuffle any other draw and sensitivity rows
+stay comparable under common random numbers.
+
+**2. Manual entry.** `POST /api/transactions`, `POST /api/invoices` and
+`POST /api/counterparties`, routed through the *same* pipeline as an import —
+fingerprint, duplicate check, counterparty resolution, classification,
+reconciliation — so a typed row carries the same provenance as an imported one.
+A typed row starts at `owner_estimate` and is promoted to `verified_actual` only
+when it is matched against an invoice already on file. A bill raised after the
+money arrived is matched backwards
+(`reconciliation.reconcile_invoice_against_unallocated`). Only hand-entered rows
+can be deleted, and deleting one releases whatever it settled.
+
+**3. CSV exports.** `/api/exports/{transactions,receivables,payables}.csv` and
+`/api/exports/passport.csv`, with paise kept integral, figures labelled by state,
+a UTF-8 BOM so Excel opens ₹ correctly, and every passport figure carrying its
+basis and evidence rank.
+
+**4. Briefings you can forward.** `/api/briefing/whatsapp` and
+`/api/briefing/email` render the morning briefing as plain text sized for one
+phone screen; `/api/receivables/{id}/reminder` composes a payment reminder in
+three tones from the customer's own numbers, with a `wa.me` link. RUNWAY
+composes these and never sends them.
+
+**Interface.** The public site became a normal multi-page SaaS site — `/`,
+`/features`, `/how-it-works` — with a shared nav and footer, no entrance
+curtain, no scroll-jacking and no pinned chapters. The workspace gained shared
+page furniture (`components/runway/page-kit.tsx`): one page header, tabbed
+sub-views, and methodology moved behind a disclosure control so a screen opens
+with one sentence instead of a paragraph.
+
 ### Phase 7 — testing and finalisation ✅
 - **210 backend tests** across money, ledger invariants, reconciliation, leakage,
   forecasting, three-state behaviour, PDF extraction, schema portability,
@@ -123,13 +166,13 @@ RUNWAY_DATABASE_URL="postgresql+psycopg:///runway?host=/run/postgresql" ./run.sh
 
 ```
 $ ./run.sh test            # SQLite
-210 passed in 75s
+251 passed in ~2 min
 
 $ ./run.sh test-pg         # the identical suite, against PostgreSQL
-210 passed in 83s
+251 passed
 
 $ ./run.sh test-web        # frontend
-75 passed in 1.2s
+95 passed in ~4 s
 ```
 
 | File | Tests | Covers |
@@ -138,9 +181,10 @@ $ ./run.sh test-web        # frontend
 | `test_ledger_invariants.py` | 9 | Balance identity, no over-allocation, no money created |
 | `test_reconciliation.py` | 24 | Duplicates, classification, entity resolution, partial payments, idempotence |
 | `test_no_leakage.py` | 5 | Features recomputed with the future hidden are byte-identical |
-| `test_forecast.py` | 17 | Quantile ordering, calibration, reproducibility, monotonicity |
+| `test_forecast.py` | 24 | Quantile ordering, calibration, reproducibility, monotonicity, revenue/delay coupling |
 | `test_three_state.py` | 10 | Versioning, scenario isolation, baseline pinning, MSMED protection |
-| `test_api_and_security.py` | 61 | Every endpoint, tenant isolation, roles, consent revocation |
+| `test_api_and_security.py` | 66 | Every endpoint, tenant isolation, roles, consent revocation |
+| `test_entry_and_export.py` | 31 | Manual entry pipeline, delete/undo, CSV exports, briefings, reminders |
 | `test_workflow_e2e.py` | 15 | The full story from import to recorded decision |
 | `test_pdf_and_portability.py` | 19 | PDF field extraction, VARCHAR portability, the 26-week cross-check |
 
@@ -152,6 +196,7 @@ $ ./run.sh test-web        # frontend
 | `primitives.test.tsx` | 28 | Accessibility, semantics, and the "colour is never the only channel" rule |
 | `api.test.ts` | 13 | Tenant headers, as-of propagation, 401 handling, error shapes |
 | `nav.test.ts` | 7 | No duplicate or dead routes, every item grouped and described |
+| `report-value.test.tsx` | 17 | Passport rendering, evidence labels, empty-state honesty |
 
 ```
 $ ./run.sh verify

@@ -4,11 +4,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { ArrowRight, Loader2, Lock, Mail, ShieldCheck } from "lucide-react";
-import { motion } from "motion/react";
 import { Logo } from "@/components/runway/shell";
-import { EASE_OUT } from "@/components/runway/motion";
-import { GridBeam, Magnetic, SplitText } from "@/components/runway/bits";
-import HeroCanvas from "@/components/runway/hero3d-loader";
 import { api, login, session } from "@/lib/api";
 
 type DemoAccount = { email: string; password: string; role: string; name: string; sees: string };
@@ -24,7 +20,7 @@ export default function LoginPage() {
   useEffect(() => {
     api.get<{ accounts: DemoAccount[] }>("/api/auth/demo-accounts")
       .then((r) => setAccounts(r.accounts)).catch(() => {});
-    // Pin the demo clock so a judge sees the same workspace the docs describe.
+    // Pin the demo clock so the workspace matches the documented figures.
     if (!session.asOf) session.setAsOf("2026-11-07");
   }, []);
 
@@ -41,33 +37,21 @@ export default function LoginPage() {
   }
 
   return (
-    <div className="relative grid min-h-dvh lg:grid-cols-[1.05fr_1fr]">
-      <div className="pointer-events-none absolute inset-0 rw-aurora" aria-hidden />
-      <GridBeam />
-
+    <div className="grid min-h-dvh lg:grid-cols-2">
       {/* left: the promise */}
-      <section className="relative hidden flex-col justify-between p-10 lg:flex xl:p-14">
+      <section className="relative hidden flex-col justify-between border-r border-border bg-surface/30 p-10 lg:flex xl:p-14">
         <Link href="/"><Logo /></Link>
-        <div className="relative max-w-lg">
-          <HeroCanvas className="pointer-events-none absolute -right-28 -top-56 h-[30rem] w-[30rem] opacity-70" />
-          <h1 className="relative font-display text-4xl font-semibold leading-[1.08] tracking-[-0.025em] text-balance xl:text-5xl">
-            <SplitText text="See the business." className="block" />
-            <SplitText text="Understand the future." className="block" delay={0.22} />
-            <span className="block text-primary">
-              <SplitText text="Test the decision." delay={0.44} />
-            </span>
+        <div className="max-w-md">
+          <h1 className="font-display text-[32px] font-semibold leading-[1.12] tracking-[-0.02em] text-balance xl:text-4xl">
+            See the business.
+            <br />Understand the future.
+            <br /><span className="text-primary">Test the decision.</span>
           </h1>
-          <motion.p
-            initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.8, duration: 0.6, ease: EASE_OUT }}
-            className="mt-5 text-pretty text-[15px] leading-relaxed text-muted-foreground">
-            RUNWAY reads your transactions, reconciles them against your invoices, and
-            projects thirteen weeks of cash with an honest uncertainty band — so you can
-            see a liquidity problem while there is still time to act on it.
-          </motion.p>
-          <motion.ul
-            initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 1.0 }}
-            className="mt-7 space-y-2.5 text-sm text-muted-foreground">
+          <p className="mt-4 text-[14.5px] leading-relaxed text-muted-foreground text-pretty">
+            RUNWAY reconciles your transactions against your invoices and projects
+            thirteen weeks of cash with an honest uncertainty band.
+          </p>
+          <ul className="mt-7 space-y-2.5 text-[13.5px] text-muted-foreground">
             {[
               "Actual, predicted and simulated kept strictly apart",
               "Every number traceable to an invoice or a transaction",
@@ -78,24 +62,23 @@ export default function LoginPage() {
                 <span>{t}</span>
               </li>
             ))}
-          </motion.ul>
+          </ul>
         </div>
         <p className="text-xs text-muted-foreground">
-          INNOVASIA 2K26 · PS-04 · Team SignalForge · Vasavi College of Engineering
+          INNOVASIA 2K26 · PS-04 · Vasavi College of Engineering
         </p>
       </section>
 
       {/* right: the form */}
-      <section className="relative flex items-center justify-center p-6 sm:p-10">
-        <motion.div
-          initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.6, ease: EASE_OUT }}
-          className="w-full max-w-md">
+      <section className="flex items-center justify-center p-6 sm:p-10">
+        <div className="w-full max-w-sm">
           <div className="lg:hidden"><Logo /></div>
-          <h2 className="mt-6 font-display text-2xl font-semibold tracking-tight lg:mt-0">
-            Welcome back
+          <h2 className="mt-8 font-display text-2xl font-semibold tracking-tight lg:mt-0">
+            Sign in
           </h2>
-          <p className="mt-1 text-sm text-muted-foreground">Sign in to your RUNWAY workspace.</p>
+          <p className="mt-1 text-[13.5px] text-muted-foreground">
+            Use a demo account below, or sign in with your own.
+          </p>
 
           <form onSubmit={submit} className="mt-7 space-y-4">
             <label className="block">
@@ -118,20 +101,21 @@ export default function LoginPage() {
             </label>
 
             {error && (
-              <p role="alert" className="rounded-lg border border-fin-loss/30 bg-fin-loss-soft px-3 py-2 text-xs text-fin-loss">
+              <p role="alert"
+                 className="rounded-lg border border-fin-loss/30 bg-fin-loss-soft px-3 py-2 text-xs text-fin-loss">
                 {error}
               </p>
             )}
 
             <button type="submit" disabled={busy}
-                    className="inline-flex h-11 w-full items-center justify-center gap-2 rounded-xl bg-primary text-sm font-semibold text-primary-foreground shadow-[var(--glow-primary)] transition-transform hover:-translate-y-0.5 disabled:translate-y-0 disabled:opacity-60">
+                    className="inline-flex h-11 w-full items-center justify-center gap-2 rounded-lg bg-primary text-sm font-semibold text-primary-foreground transition-opacity hover:opacity-90 disabled:opacity-60">
               {busy ? <Loader2 className="size-4 animate-spin" /> : <>Sign in <ArrowRight className="size-4" /></>}
             </button>
           </form>
 
           {accounts.length > 0 && (
             <div className="mt-8">
-              <p className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
+              <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
                 Demo accounts
               </p>
               <ul className="mt-2.5 space-y-2">
@@ -153,12 +137,16 @@ export default function LoginPage() {
                 ))}
               </ul>
               <p className="mt-3 text-[11px] leading-relaxed text-muted-foreground">
-                These accounts exist only in the demonstration workspace and open a
-                synthetic business. Production authentication is separate.
+                These accounts open a synthetic business. Production authentication
+                is separate.
               </p>
             </div>
           )}
-        </motion.div>
+
+          <p className="mt-8 text-[11.5px] text-muted-foreground">
+            <Link href="/" className="hover:text-foreground">← Back to runway</Link>
+          </p>
+        </div>
       </section>
     </div>
   );

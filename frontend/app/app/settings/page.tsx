@@ -9,6 +9,7 @@ import { api, session } from "@/lib/api";
 import { useApi, useMutation } from "@/lib/use-api";
 import { inr, pct } from "@/lib/format";
 import { cn } from "@/lib/utils";
+import { Details } from "@/components/runway/page-kit";
 
 export default function SettingsPage() {
   const biz = useApi<any>("/api/business");
@@ -184,7 +185,11 @@ export default function SettingsPage() {
                   <Loader2 className="size-3 animate-spin" /> Regenerating the workspace…
                 </p>
               )}
-              <Provenance>{scenarios.data.note}</Provenance>
+              <div className="mt-3">
+            <Details label="How this is calculated">
+              {scenarios.data.note}
+            </Details>
+          </div>
             </Panel>
           )}
 
@@ -194,10 +199,12 @@ export default function SettingsPage() {
               {refresh.pending ? <Loader2 className="size-3.5 animate-spin" /> : <RefreshCw className="size-3.5" />}
               Rebuild the digital twin now
             </button>
-            <Provenance>
+            <div className="mt-3">
+            <Details label="How accuracy is measured">
               Forces a fresh actual state and a new forecast version. The previous versions
               are preserved so forecast accuracy stays measurable.
-            </Provenance>
+            </Details>
+          </div>
           </Panel>
 
           {meta.data && (

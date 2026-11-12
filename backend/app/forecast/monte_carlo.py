@@ -25,6 +25,17 @@ used for correlated defaults in credit portfolios. ``rho`` is estimated from
 the business's own data by ``analytics.concentration.correlated_exposure``
 and defaults to 0.25 when there is too little history.
 
+**Revenue / payment-delay coupling.** A path in which demand collapses is
+also a path in which the customers who still owe money stretch their terms -
+that is what a downturn *is*. ``ForecastInputs.revenue_delay_coupling`` (see
+``cashflow.estimate_revenue_delay_coupling``) drives a single latent market
+factor ``M`` per path. A weak market (``M < 0``) lowers that path's weekly
+sales multiplier and, through the same factor, adds days to every collection.
+The delay side is one-sided and capped: good conditions never pay *early*,
+they simply pay as predicted, so the coupling widens the bad tail without
+inventing an upside. With coupling set to 0 the engine consumes exactly the
+same random stream as before, so existing results are unchanged bit for bit.
+
 **Common random numbers.** A scenario comparison re-uses the *same* seed and
 therefore the same random draws as the baseline, so the difference between
 the two paths is the decision and not the noise. This is standard variance
@@ -40,6 +51,23 @@ import numpy as np
 from app.forecast.cashflow import ForecastInputs
 
 DEFAULT_PATHS = 4000
+
+# How many standard deviations of market weakness are allowed to translate
+# into extra collection delay. Beyond ~3 sigma the estimate is extrapolating
+# anyway, and an uncapped tail would let one path dominate the percentile.
+SHORTFALL_CAP = 3.0
+
+# Distinguishes the market-factor stream from the simulation's main stream.
+MARKET_STREAM_SALT = 0xC0FFEE
+
+# Mean of ``clip(-Z, 0, SHORTFALL_CAP)`` for Z ~ N(0,1), in closed form:
+#   E = (phi(0) - phi(c)) + c * Phi(-c)
+# Used only to report the average effect of the coupling in the assumptions.
+def _shortfall_mean(cap: float = SHORTFALL_CAP) -> float:
+    from math import erfc, exp, pi, sqrt
+    phi = lambda x: exp(-0.5 * x * x) / sqrt(2 * pi)
+    Phi_minus = lambda x: 0.5 * erfc(x / sqrt(2))
+    return (phi(0.0) - phi(cap)) + cap * Phi_minus(cap)
 
 
 @dataclass
@@ -121,6 +149,20 @@ def simulate(fi: ForecastInputs, *, paths: int = DEFAULT_PATHS, seed: int = 2026
     W = fi.horizon_weeks
     week_starts = [fi.as_of + timedelta(days=7 * i) for i in range(W + 1)]
 
+    # One latent market condition per path, shared by demand and by payment
+    # speed. It gets its *own* random stream: switching the coupling on, or
+    # strengthening it, must not reshuffle every other draw in the model, or
+    # the sensitivity table could no longer be read under common random
+    # numbers and a "coupling doubled" row would be half sampling noise.
+    coupling = float(np.clip(getattr(fi, "revenue_delay_coupling", 0.0) or 0.0, 0.0, 1.0))
+    market: np.ndarray | None = None
+    shortfall: np.ndarray | None = None
+    if coupling > 0:
+        market_rng = np.random.default_rng([seed, MARKET_STREAM_SALT])
+        market = market_rng.standard_normal(paths)
+        shortfall = np.clip(-market, 0.0, SHORTFALL_CAP)
+    delay_stretch_days = coupling * float(fi.new_sales_collection_lag_days)
+
     inflow = np.zeros((paths, W + 1))
     outflow = np.zeros((paths, W + 1))
     beyond_receivables = beyond_payables = beyond_new_sales = 0
@@ -140,6 +182,11 @@ def simulate(fi: ForecastInputs, *, paths: int = DEFAULT_PATHS, seed: int = 2026
         idio = rng.standard_normal((paths, len(fi.inflows)))      # invoice-specific
         shock = 0.75 * cust[:, cp_ix] + 0.25 * idio
         days = np.maximum(0.0, mu[None, :] + sg[None, :] * shock)
+        if shortfall is not None:
+            # Same market, same stretch on every open invoice: a downturn is
+            # not something one customer experiences alone. One-sided, so
+            # good conditions never shorten a predicted payment date.
+            days = days + delay_stretch_days * shortfall[:, None]
         wi = _week_index(days, fi.as_of, W)
         vals = np.broadcast_to(amt[None, :], wi.shape).astype(float)
         beyond_receivables = _scatter(inflow, wi, vals, W)
@@ -160,10 +207,23 @@ def simulate(fi: ForecastInputs, *, paths: int = DEFAULT_PATHS, seed: int = 2026
     new_sales = np.array(fi.weekly_new_sales_paise, dtype=float)
     if new_sales.size:
         mult = rng.lognormal(mean=-0.5 * sigma_ln ** 2, sigma=sigma_ln, size=(paths, new_sales.size))
+        if market is not None and sigma_ln > 0:
+            # Rotate each week's demand draw towards the shared market factor.
+            # Recovering the standard normal behind the lognormal keeps the
+            # *marginal* weekly distribution exactly as specified - only the
+            # correlation across weeks changes - so a weak path is weak
+            # because of the market, not because thirteen dice all came up low.
+            z = (np.log(mult) + 0.5 * sigma_ln ** 2) / sigma_ln
+            kappa = min(0.85, coupling)
+            z = np.sqrt(1.0 - kappa) * z + np.sqrt(kappa) * market[:, None]
+            mult = np.exp(sigma_ln * z - 0.5 * sigma_ln ** 2)
         realised = new_sales[None, :] * mult
         lag = np.maximum(
             1.0, rng.normal(fi.new_sales_collection_lag_days, fi.new_sales_lag_sigma,
                             size=(paths, new_sales.size)))
+        if shortfall is not None:
+            # Sales made into a weak market are collected on stretched terms.
+            lag = lag + delay_stretch_days * shortfall[:, None]
         committed = fi.baseline_weekly_sales_paise or list(new_sales)
         for k in range(new_sales.size):
             # sale is booked mid-week k+1, collected lag days later
@@ -247,6 +307,18 @@ def simulate(fi: ForecastInputs, *, paths: int = DEFAULT_PATHS, seed: int = 2026
             **fi.assumptions,
             "paths": paths, "seed": seed,
             "delay_correlation_rho": fi.delay_correlation,
+            "revenue_delay_coupling": round(coupling, 3),
+            "revenue_delay_coupling_note": (
+                "Weak demand and slow payment are drawn from one shared market "
+                "factor, so a downturn path is simultaneously lighter on sales "
+                "and slower on collections. The delay effect is one-sided: a "
+                "good market does not make customers pay early. At the current "
+                f"coupling of {coupling:.2f} and a "
+                f"{fi.new_sales_collection_lag_days:.0f}-day collection cycle, "
+                "the average path adds about "
+                f"{coupling * fi.new_sales_collection_lag_days * _shortfall_mean():.1f} "
+                f"days of delay and the worst paths up to "
+                f"{coupling * fi.new_sales_collection_lag_days * SHORTFALL_CAP:.0f}."),
             "revenue_cv": round(cv, 3), "opex_cv": fi.opex_cv,
             "shock_weekly_rate": fi.shock_weekly_rate,
             "shock_mean_paise": fi.shock_mean_paise,
@@ -355,6 +427,11 @@ def sensitivity(fi: ForecastInputs, *, paths: int = 1200, seed: int = 20260101) 
             f, "weekly_opex_paise", int(f.weekly_opex_paise * 1.1))),
         ("Delay correlation 0.6 instead of estimated",
          lambda f: setattr(f, "delay_correlation", 0.6)),
+        ("Downturn coupling off (sales and payment speed independent)",
+         lambda f: setattr(f, "revenue_delay_coupling", 0.0)),
+        ("Downturn coupling doubled",
+         lambda f: setattr(f, "revenue_delay_coupling",
+                           min(1.0, f.revenue_delay_coupling * 2))),
     ]
     for label, mutate in knobs:
         f = fi.copy()

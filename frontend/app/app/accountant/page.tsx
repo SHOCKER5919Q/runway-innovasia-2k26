@@ -6,6 +6,7 @@ import {
   ErrorState, LevelPill, LoadingPanel, Panel, Provenance, SectionHeader, Stat,
 } from "@/components/runway/primitives";
 import { session } from "@/lib/api";
+import { Details } from "@/components/runway/page-kit";
 import { useApi } from "@/lib/use-api";
 import { money, pct, weeks } from "@/lib/format";
 import { cn } from "@/lib/utils";
@@ -97,7 +98,11 @@ export default function AccountantPage() {
         ))}
       </div>
 
-      <Provenance>{data.note}</Provenance>
+      <div className="mt-3">
+            <Details label="How this is calculated">
+              {data.note}
+            </Details>
+          </div>
     </div>
   );
 }

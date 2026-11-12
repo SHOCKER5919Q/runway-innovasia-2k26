@@ -3,8 +3,10 @@
 import { AlertTriangle, CalendarDays, Scale } from "lucide-react";
 import { AgeingBars } from "@/components/runway/charts";
 import {
-  ErrorState, Evidence, LoadingPanel, Panel, Provenance, SectionHeader, Stat, StateBadge,
+  ErrorState, LoadingPanel, Panel, Stat, StateBadge,
 } from "@/components/runway/primitives";
+import { Details, ExportButton, Note, PageHeader, Tabs, useTabs }
+  from "@/components/runway/page-kit";
 import { useApi } from "@/lib/use-api";
 import { inr, money, pct, shortDate } from "@/lib/format";
 import { cn } from "@/lib/utils";
@@ -17,10 +19,12 @@ export default function PayablesPage() {
 
   return (
     <div className="space-y-5">
-      <SectionHeader
+      <PageHeader
         title="Payables"
-        description="What you owe, when it is contractually due, and where a statutory deadline arrives first."
-        actions={<StateBadge state="actual" />} />
+        subtitle="What you owe, when it is contractually due, and where a statutory deadline arrives first."
+        state={<StateBadge state="actual" />}
+        actions={<ExportButton path="/api/exports/payables.csv"
+                               filename="runway-payables.csv" label="Export" />} />
 
       <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
         <Stat label="Total payable" value={inr(data.ageing.total_paise)} state="actual" />
@@ -38,7 +42,9 @@ export default function PayablesPage() {
             <div className="min-w-0 flex-1">
               <p className="text-sm font-medium">MSMED / Section 43B(h) exposure</p>
               <p className="mt-1 text-xs leading-relaxed text-muted-foreground text-pretty">{m.rule}</p>
-              <p className="mt-1.5 text-xs leading-relaxed text-muted-foreground text-pretty">{m.caveat}</p>
+              <div className="mt-2 max-w-2xl">
+                <Details label="What this means for your taxes" dense>{m.caveat}</Details>
+              </div>
               {m.items?.length > 0 && (
                 <div className="mt-3 overflow-x-auto">
                   <table className="w-full text-[12px]">
@@ -152,10 +158,12 @@ export default function PayablesPage() {
             </tbody>
           </table>
         </div>
-        <Provenance>
-          The annualised equivalent of a discount d taken n days early is
-          (d / (1 − d)) × (365 / n). Compare it against your cost of credit before taking it.
-        </Provenance>
+        <div className="mt-3">
+          <Details label="How the discount return is annualised">
+            A discount d taken n days early annualises to (d / (1 − d)) × (365 / n).
+            Compare it against your cost of credit before taking it.
+          </Details>
+        </div>
       </Panel>
     </div>
   );

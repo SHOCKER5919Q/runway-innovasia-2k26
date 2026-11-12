@@ -7,6 +7,7 @@ import {
   ErrorState, Evidence, LevelPill, LoadingPanel, Panel, Provenance, SectionHeader,
   Stat, StateBadge,
 } from "@/components/runway/primitives";
+import { Details, Note, PageHeader } from "@/components/runway/page-kit";
 import { useApi } from "@/lib/use-api";
 import { inr, money, pct, titleCase, weeks } from "@/lib/format";
 import { cn } from "@/lib/utils";
@@ -27,9 +28,9 @@ export default function RiskPage() {
 
   return (
     <div className="space-y-5">
-      <SectionHeader
-        title="Risk Centre"
-        description="Early warnings from your own ledger, plus stress tests that ask whether the business survives — not whether the event will happen." />
+      <PageHeader
+        title="Risk centre"
+        subtitle="Early warnings from your own ledger, plus stress tests that ask whether the business survives." />
 
       <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-5">
         <Stat label="Liquidity VaR (95%)" value={money(m.liquidity_var)} tone="warn"
@@ -165,10 +166,12 @@ export default function RiskPage() {
             </tbody>
           </table>
         </div>
-        <Provenance>
-          "Survives" means the P10 cash path stays at or above zero. "With OD" means it
+        <div className="mt-3">
+            <Details label="How this is calculated">
+              "Survives" means the P10 cash path stays at or above zero. "With OD" means it
           only does so after drawing the sanctioned overdraft, which is credit, not cash.
-        </Provenance>
+            </Details>
+          </div>
       </Panel>
 
       {/* ── risk surface ── */}

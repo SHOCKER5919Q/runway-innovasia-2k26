@@ -14,6 +14,11 @@ Ordered by what unblocks the most, not by what is most interesting.
 | **PDF invoice import** | Text-layer extraction with per-field confidence; OCR for scans via tesseract when present. Refuses rather than guesses. |
 | **26-week cross-check** | Run-rate-changing scenarios are re-run over two quarters instead of the bias merely being disclosed. |
 | **Frontend test suite** | 75 tests across formatting, component accessibility, the API client and navigation. |
+| **Revenue / payment-delay coupling** | The top modelling gap. One latent market factor now drives both weekly demand and collection delay, estimated per business from monthly billing vs mean days-late. One-sided, capped at 0.60, on its own random stream so sensitivity stays comparable. |
+| **Manual entry** | `POST /api/transactions`, `/api/invoices`, `/api/counterparties` through the same pipeline as an import, with backward matching for a bill raised after the money arrived. |
+| **CSV exports** | Transactions, receivables, payables and the Cash Health Passport, with paise kept integral and every figure labelled by state. |
+| **Forwardable briefings** | WhatsApp/email rendering of the morning briefing and per-invoice payment reminders in three tones. Composed, never sent. |
+| **Interface rewrite** | Public site split into `/`, `/features`, `/how-it-works` with shared chrome; workspace screens converted to tabbed sub-views with methodology behind disclosure. |
 
 ---
 
@@ -39,7 +44,6 @@ are done.
 | **Background worker** | So an import returns immediately rather than waiting ~5 s for a state rebuild. |
 | **Browser tests** | Nothing currently drives a real browser through the signature demonstration. |
 | **More backfilled forecast runs** | Long-horizon coverage is reported on two observations. More history makes it measurable rather than merely stated with its sample size. |
-| **Revenue–delay correlation** | In a downturn both worsen together. Modelled independently today; the most defensible single modelling addition. |
 | **Chart-layer tests** | Recharts needs layout, which jsdom does not provide. Needs a real browser runner. |
 
 ---
@@ -51,7 +55,7 @@ are done.
 | **Payment gateway webhooks** | Merchant account and a public endpoint | Lowest barrier, immediate value — settlements arrive continuously |
 | **Tally live connector** | A local agent | Most MSMEs already run Tally; the XML path already works |
 | **GST via a GSP** | A GSP contract | Removes manual register upload and makes the liability estimate verifiable |
-| **WhatsApp briefing** | Business Cloud API and approved templates | The briefing already exists server-side. This is the delivery channel for the daily habit the product depends on |
+| **WhatsApp briefing delivery** | Business Cloud API and approved templates | The briefing text and the `wa.me` handoff now exist (`/api/briefing/whatsapp`); this is the server-side delivery channel for the daily habit the product depends on |
 | **Account Aggregator** | Regulated-entity eligibility or a TSP arrangement | Highest value, highest barrier. The adapter and data model are already built |
 | **TReDS** | Platform agreement and buyer acceptance | The economics are already modelled; this turns a recommendation into an action |
 

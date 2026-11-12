@@ -5,8 +5,10 @@ import {
   Check, Copy, Download, FileBarChart, Link2, Loader2, ShieldCheck, Trash2,
 } from "lucide-react";
 import {
-  ErrorState, Evidence, LoadingPanel, Panel, Provenance, SectionHeader, Stat, StateBadge,
+  ErrorState, LoadingPanel, Panel, StateBadge,
 } from "@/components/runway/primitives";
+import { Button, CopyButton, Details, ExportButton, Note, PageHeader, Tabs, useTabs }
+  from "@/components/runway/page-kit";
 import { api } from "@/lib/api";
 import { useApi, useMutation } from "@/lib/use-api";
 import { inr, longDate, pct, titleCase } from "@/lib/format";
@@ -27,7 +29,7 @@ export default function ReportsPage() {
   const [recipient, setRecipient] = useState("");
   const [days, setDays] = useState(30);
   const [issued, setIssued] = useState<any>(null);
-  const [copied, setCopied] = useState(false);
+  const [tab, setTab] = useTabs("reports", "passport");
 
   const share = useMutation<void, any>(async () => {
     const r = await api.post<any>("/api/reports/passport/share",
@@ -50,15 +52,24 @@ export default function ReportsPage() {
 
   return (
     <div className="space-y-5">
-      <SectionHeader
+      <PageHeader
         title="Reports"
-        description="The Cash Health Passport is your business's own financial record, assembled from your ledger and shared only when you choose."
-        actions={
-          <button onClick={download}
-                  className="inline-flex items-center gap-1.5 rounded-lg border border-border px-3 py-1.5 text-xs hover:bg-surface-hover">
-            <Download className="size-3.5" /> Download JSON
-          </button>} />
+        subtitle="Your Cash Health Passport, assembled from your ledger and shared only when you choose."
+        actions={<>
+          <ExportButton path="/api/exports/passport.csv"
+                        filename="runway-passport.csv" label="Export CSV" />
+          <Button icon={<Download className="size-3.5" />} onClick={download}>JSON</Button>
+        </>} />
 
+      <Tabs active={tab} onChange={setTab} tabs={[
+        { key: "passport", label: "Passport" },
+        { key: "sharing", label: "Sharing" },
+      ]} />
+
+      {tab !== "passport" ? <Sharing shares={shares} recipient={recipient}
+        setRecipient={setRecipient} days={days} setDays={setDays}
+        share={share} issued={issued} /> : (
+      <>
       <Panel title={p.report_type}
              description={`${p.business.name} · as of ${longDate(p.as_of)} · version ${p.version}`}
              actions={<span className="rw-chip border-border bg-surface text-muted-foreground">
@@ -87,7 +98,14 @@ export default function ReportsPage() {
           ))}
         </div>
       </Panel>
+      </>
+      )}
+    </div>
+  );
+}
 
+function Sharing({ shares, recipient, setRecipient, days, setDays, share, issued }: any) {
+  return (
       <div className="grid gap-4 lg:grid-cols-2">
         <Panel title="Share with a lender, NBFC or accountant"
                description="Issues a revocable, expiring link under an explicit consent record.">
@@ -122,24 +140,20 @@ export default function ReportsPage() {
                   <code className="min-w-0 flex-1 truncate rounded bg-background/50 px-2 py-1 font-mono text-[10px]">
                     {typeof window !== "undefined" ? window.location.origin : ""}/shared/{issued.token}
                   </code>
-                  <button onClick={() => {
-                            navigator.clipboard.writeText(`${window.location.origin}/shared/${issued.token}`);
-                            setCopied(true); setTimeout(() => setCopied(false), 1800);
-                          }}
-                          className="rounded border border-border p-1.5 hover:bg-surface-hover"
-                          aria-label="Copy link">
-                    {copied ? <Check className="size-3 text-fin-gain" /> : <Copy className="size-3" />}
-                  </button>
+                  <CopyButton text={`${window.location.origin}/shared/${issued.token}`}
+                              size="sm" className="border border-border" />
                 </div>
                 <p className="mt-1.5 text-[10px] text-muted-foreground">{issued.note}</p>
               </div>
             )}
           </div>
-          <Provenance>
-            Sharing creates a consent record with a purpose, a grantee and an expiry.
-            Revoking it disables the link immediately. RUNWAY never sells or syndicates
-            this data.
-          </Provenance>
+          <div className="mt-3">
+            <Details label="What happens when you share">
+              Sharing creates a consent record with a purpose, a grantee and an
+              expiry. Revoking it disables the link immediately. RUNWAY never
+              sells or syndicates this data.
+            </Details>
+          </div>
         </Panel>
 
         <Panel title="Issued links" description="Everyone who currently has access">
@@ -175,7 +189,6 @@ export default function ReportsPage() {
           )}
         </Panel>
       </div>
-    </div>
   );
 }
 

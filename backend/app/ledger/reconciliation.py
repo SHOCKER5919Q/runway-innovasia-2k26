@@ -148,6 +148,95 @@ def match_transaction(db, txn: Transaction) -> MatchResult:
     return res
 
 
+def reconcile_invoice_against_unallocated(db, inv: Invoice) -> list[dict]:
+    """Settle a *newly created* invoice against payments already on the books.
+
+    ``match_transaction`` runs the other way round: it takes a payment and
+    looks for invoices. That is the right direction for an import, where the
+    bank row is the new fact. It is the wrong direction for manual entry,
+    where an owner often raises last month's invoice *after* the money has
+    already landed - nothing would ever match, and the invoice would sit open
+    forever next to a payment that clearly belongs to it.
+
+    Same invariants as the forward pass: never allocate more than the invoice
+    has outstanding, never more than a transaction has unallocated, and never
+    let both sides of one invoice be settled by the same paise.
+    """
+    if inv.outstanding_paise <= 0:
+        return []
+    want = InvoiceKind.SALES if inv.kind == InvoiceKind.SALES else InvoiceKind.PURCHASE
+    direction = Direction.CREDIT if inv.kind == InvoiceKind.SALES else Direction.DEBIT
+    skip = {TxnCategory.PAYROLL, TxnCategory.GST_PAYMENT, TxnCategory.TAX_OTHER,
+            TxnCategory.BANK_CHARGES, TxnCategory.LOAN_REPAYMENT,
+            TxnCategory.LOAN_DISBURSAL, TxnCategory.TRANSFER,
+            TxnCategory.GATEWAY_FEE, TxnCategory.INTEREST_INCOME,
+            TxnCategory.OWNER_DRAW, TxnCategory.CAPITAL_IN, TxnCategory.PF_ESI,
+            TxnCategory.RENT, TxnCategory.UTILITIES, TxnCategory.FREIGHT}
+    q = select(Transaction).where(
+        Transaction.business_id == inv.business_id,
+        Transaction.direction == direction,
+        Transaction.counterparty_id == inv.counterparty_id,
+        Transaction.value_date >= inv.issue_date - timedelta(days=DATE_WINDOW_BEFORE),
+        Transaction.value_date <= inv.due_date + timedelta(days=DATE_WINDOW_AFTER),
+    ).order_by(Transaction.value_date)
+    created: list[dict] = []
+    for txn in db.scalars(q).all():
+        if inv.outstanding_paise <= 0:
+            break
+        if txn.category in skip:
+            continue
+        free = txn.unallocated_paise
+        if free <= 0:
+            continue
+        refs = {r.upper().replace("/", "-") for r in _extract_invoice_refs(
+            f"{txn.narration} {txn.reference_no or ''}")}
+        norm_no = inv.invoice_no.upper().replace("/", "-")
+        score = 0.0
+        why = []
+        if norm_no in refs or any(norm_no in r or r in norm_no for r in refs):
+            score += 0.60; why.append(f"narration cites {inv.invoice_no}")
+        if abs(inv.outstanding_paise - free) <= max(100, int(0.001 * free)):
+            score += 0.25; why.append("amount equals the invoice total exactly")
+        elif free < inv.outstanding_paise:
+            score += 0.08; why.append("plausible part payment")
+        gap = abs((txn.value_date - inv.due_date).days)
+        if gap <= 7:
+            score += 0.12; why.append(f"paid within {gap} days of the due date")
+        elif gap <= 45:
+            score += 0.05; why.append(f"paid {gap} days from the due date")
+        if txn.value_date < inv.issue_date - timedelta(days=3):
+            score -= 0.35; why.append("payment predates the invoice")
+        if score < 0.50:
+            continue
+
+        take = min(free, inv.outstanding_paise)
+        if take <= 0:
+            continue
+        db.add(Allocation(
+            business_id=inv.business_id, transaction_id=txn.id, invoice_id=inv.id,
+            amount_paise=take, method="auto", confidence=round(min(0.99, score), 2),
+            rationale=f"manual invoice matched back to an existing payment: {'; '.join(why)}"[:300]))
+        inv.settled_paise += take
+        if inv.first_payment_date is None or txn.value_date < inv.first_payment_date:
+            inv.first_payment_date = txn.value_date
+        txn.allocated_paise = min(txn.settleable_paise, txn.allocated_paise + take)
+        if txn.unallocated_paise <= 0:
+            txn.recon_status = ReconStatus.MATCHED
+        elif txn.allocated_paise > 0 and txn.recon_status == ReconStatus.UNRECONCILED:
+            txn.recon_status = ReconStatus.PARTIALLY_MATCHED
+        created.append({"transaction_id": txn.id, "amount_paise": take,
+                        "confidence": round(min(0.99, score), 2),
+                        "why": "; ".join(why)})
+
+    if inv.settled_paise > 0:
+        if inv.outstanding_paise <= 0:
+            inv.status = InvoiceStatus.PAID
+        else:
+            inv.status = InvoiceStatus.PART_PAID
+    db.flush()
+    return created
+
+
 def apply_match(db, txn: Transaction, res: MatchResult) -> list[Allocation]:
     """Persist allocations, enforcing the no-overdraw invariants."""
     created: list[Allocation] = []

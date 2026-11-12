@@ -7,6 +7,7 @@ import { HealthGauge } from "@/components/runway/charts";
 import {
   ErrorState, LoadingPanel, Panel, Provenance, SectionHeader, Stat, StateBadge,
 } from "@/components/runway/primitives";
+import { Details, Note, PageHeader } from "@/components/runway/page-kit";
 import { useApi } from "@/lib/use-api";
 import { inr, money, pct } from "@/lib/format";
 import { cn } from "@/lib/utils";
@@ -21,9 +22,9 @@ export default function HealthPage() {
 
   return (
     <div className="space-y-5">
-      <SectionHeader
-        title="Financial Health"
-        description="A transparent indicator over eight dimensions. Every weight, threshold and input is visible and configurable." />
+      <PageHeader
+        title="Financial health"
+        subtitle="A transparent indicator over eight dimensions. Every weight, threshold and input is visible." />
 
       <div className="grid gap-4 lg:grid-cols-[320px_1fr]">
         <Panel bodyClass="flex flex-col items-center p-6">
@@ -123,10 +124,12 @@ export default function HealthPage() {
               </li>
             ))}
           </ul>
-          <Provenance>
-            Scores are configurable per business and per industry. Changing a weight
+          <div className="mt-3">
+            <Details label="How this is calculated">
+              Scores are configurable per business and per industry. Changing a weight
             changes the score transparently rather than silently.
-          </Provenance>
+            </Details>
+          </div>
         </Panel>
       </div>
     </div>

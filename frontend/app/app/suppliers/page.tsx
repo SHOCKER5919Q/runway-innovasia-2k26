@@ -4,6 +4,7 @@ import { ConcentrationPie } from "@/components/runway/charts";
 import {
   ErrorState, LoadingPanel, Panel, Provenance, SectionHeader, Stat, StateBadge,
 } from "@/components/runway/primitives";
+import { Details, Note, PageHeader } from "@/components/runway/page-kit";
 import { useApi } from "@/lib/use-api";
 import { inr, pct, shortDate } from "@/lib/format";
 import { cn } from "@/lib/utils";
@@ -19,10 +20,10 @@ export default function SuppliersPage() {
 
   return (
     <div className="space-y-5">
-      <SectionHeader
+      <PageHeader
         title="Suppliers"
-        description="Where your outgoing commitments concentrate, and which of them are negotiable."
-        actions={<StateBadge state="actual" />} />
+        subtitle="Where your outgoing commitments concentrate, and which of them are negotiable."
+        state={<StateBadge state="actual" />} />
 
       <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
         <Stat label="Suppliers" value={s.length} state="actual" />
@@ -125,10 +126,12 @@ export default function SuppliersPage() {
           </table>
         </div>
         <div className="px-4 pb-3">
-          <Provenance>
-            The MSME class shown is what is recorded against each supplier in this
+          <div className="mt-3">
+            <Details label="How this is calculated">
+              The MSME class shown is what is recorded against each supplier in this
             workspace. Confirm Udyam registration before relying on it for a tax position.
-          </Provenance>
+            </Details>
+          </div>
         </div>
       </Panel>
     </div>
