@@ -16,8 +16,8 @@
    PREDICTED (forest band) and SIMULATED (amber, dashed) in one frame.
 
    Figures: the synthetic wholesale distributor shipped with the demo seed,
-   rounded to the paise the ledger actually stores. Nothing here is invented
-   for the marketing page — the ticker above reads the same numbers.
+   copied from the engine's own output (see the note above WEEK_STARTS).
+   Nothing here is invented for the marketing page.
    ───────────────────────────────────────────────────────────────────────── */
 
 import { useState } from "react";
@@ -36,18 +36,27 @@ import { inr, weeks as fmtWeeks, pct } from "@/lib/format";
 
 const L = (lakh: number) => Math.round(lakh * 100_000 * 100); // ₹ lakh → paise
 
+/* Every figure below is copied from the running engine for demo scenario B
+   (Sri Lakshmi Industrial Supplies) as of 2026-11-07, engine 0.9.0, 4,000
+   paths, seed 20260101: GET /api/overview, /api/risk, /api/customers and
+   POST /api/scenarios/quick-run. If the seed or the engine changes, re-pull
+   them; do not hand-tune them. Week 0 is the as-of date (one actual point). */
 const WEEK_STARTS = [
-  "2026-03-02", "2026-03-09", "2026-03-16", "2026-03-23", "2026-03-30",
-  "2026-04-06", "2026-04-13", "2026-04-20", "2026-04-27", "2026-05-04",
-  "2026-05-11", "2026-05-18", "2026-05-25",
+  "2026-11-07", "2026-11-14", "2026-11-21", "2026-11-28", "2026-12-05",
+  "2026-12-12", "2026-12-19", "2026-12-26", "2027-01-02", "2027-01-09",
+  "2027-01-16", "2027-01-23", "2027-01-30", "2027-02-06",
 ];
+
+/** Cash after lien-marked balances (the forecast's opening point). */
+const AVAILABLE_CASH = 47_722_173; // ₹4,77,221 — also net of committed payments
+const HEALTH_TODAY = 72.8;
 
 const BASE: CashSeries = {
   week_starts: WEEK_STARTS,
-  p50: [4.77, 6.10, 7.35, 6.90, 8.30, 9.55, 11.20, 10.40, 12.10, 13.80, 15.20, 14.60, 16.90].map(L),
-  p10: [4.77, 4.55, 4.10, 3.52, 3.00, 2.41, 1.95, 1.60, 1.88, 2.30, 2.85, 2.60, 3.20].map(L),
-  p90: [4.77, 8.00, 11.30, 11.90, 15.10, 18.40, 21.60, 20.90, 24.20, 26.80, 29.40, 28.70, 32.10].map(L),
-  safety_buffer_paise: L(2.5),
+  p50: [9.07, 16.86, 21.02, 26.07, 23.55, 19.65, 18.99, 19.58, 23.46, 25.38, 28.27, 25.22, 27.47, 27.30].map(L),
+  p10: [9.07, 6.48, 6.71, 10.34, 8.49, 6.41, 5.07, 4.77, 7.24, 8.94, 11.96, 9.36, 12.18, 12.53].map(L),
+  p90: [9.07, 32.39, 35.49, 38.44, 36.27, 33.49, 33.94, 36.23, 40.44, 42.93, 45.60, 42.05, 44.45, 43.72].map(L),
+  safety_buffer_paise: L(3),
 };
 
 type Scenario = {
@@ -59,7 +68,7 @@ type Scenario = {
   runwayP10: number;
   breach: number;
   breachWeeks: number[];
-  health: number;
+  cvarLakh: number;
   note: string;
 };
 
@@ -70,38 +79,38 @@ const SCENARIOS: Scenario[] = [
     lever: "No lever pulled",
     overlay: null,
     runwayP10: 4.85,
-    breach: 0.17,
-    breachWeeks: [0.01, 0.02, 0.05, 0.09, 0.14, 0.17, 0.16, 0.15, 0.11, 0.08, 0.06, 0.07, 0.05],
-    health: 72.8,
-    note: "The forecast as the ledger stands. P10 touches the buffer in week five.",
+    breach: 0.2175,
+    breachWeeks: [0.022, 0.043, 0.020, 0.045, 0.069, 0.075, 0.081, 0.053, 0.040, 0.023, 0.046, 0.028, 0.025],
+    cvarLakh: 12.34,
+    note: "The forecast as the ledger stands. The P10 path comes closest to the buffer in the week of 26 Dec.",
   },
   {
     id: "supplier",
     label: "Pay suppliers 7 days later",
-    lever: "supplier_credit_days +7",
+    lever: "supplier_terms +7d, MSMED respected",
     overlay: {
-      p50: [4.77, 7.65, 9.00, 8.60, 9.95, 11.10, 12.60, 11.70, 13.20, 14.70, 15.90, 15.20, 17.30].map(L),
-      p10: [4.77, 6.05, 5.70, 5.15, 4.60, 4.05, 3.55, 3.20, 3.35, 3.65, 4.05, 3.80, 4.25].map(L),
+      p50: [9.07, 16.89, 21.84, 26.13, 23.61, 19.80, 18.99, 19.58, 23.46, 25.38, 28.26, 25.22, 27.47, 27.30].map(L),
+      p10: [9.07, 6.49, 7.54, 10.36, 8.56, 6.56, 5.07, 4.77, 7.24, 8.94, 11.96, 9.36, 12.18, 12.53].map(L),
     },
-    runwayP10: 13.0,
-    breach: 0.04,
-    breachWeeks: [0.00, 0.00, 0.01, 0.02, 0.03, 0.04, 0.04, 0.04, 0.03, 0.02, 0.02, 0.02, 0.01],
-    health: 79.1,
-    note: "Legal headroom only — eleven of nineteen suppliers are micro or small, so MSMED §15 caps them at 45 days.",
+    runwayP10: 4.98,
+    breach: 0.215,
+    breachWeeks: [0.021, 0.035, 0.019, 0.045, 0.068, 0.075, 0.081, 0.053, 0.040, 0.023, 0.046, 0.028, 0.025],
+    cvarLakh: 12.31,
+    note: "Almost no headroom: eight of ten suppliers are micro or small, so MSMED §15 protects their invoices. Only 2 bills worth ₹1,08,854 can move.",
   },
   {
     id: "concentration",
     label: "Largest customer pays 30 days late",
-    lever: "ABC Distributors DSO +30",
+    lever: "payment_delay ABC Distributors +30d",
     overlay: {
-      p50: [4.77, 5.20, 5.05, 3.90, 4.40, 4.95, 6.20, 5.40, 7.30, 9.60, 11.40, 11.00, 13.60].map(L),
-      p10: [4.77, 3.70, 2.55, 1.40, 0.55, -0.35, -0.95, -1.20, -0.60, 0.25, 0.95, 0.80, 1.60].map(L),
+      p50: [9.07, 10.20, 9.83, 10.48, 6.00, 2.21, 2.39, 3.95, 8.13, 11.21, 16.02, 15.20, 21.00, 23.58].map(L),
+      p10: [9.07, 4.02, 1.58, 2.19, -3.65, -10.10, -13.14, -13.25, -10.12, -7.37, -2.70, -3.31, 2.19, 6.16].map(L),
     },
-    runwayP10: 2.6,
-    breach: 0.58,
-    breachWeeks: [0.02, 0.09, 0.24, 0.41, 0.52, 0.58, 0.57, 0.55, 0.47, 0.36, 0.28, 0.30, 0.22],
-    health: 51.4,
-    note: "One customer is 31.2% of the book. The overdraft is reached in week six, not week thirteen.",
+    runwayP10: 1.46,
+    breach: 0.7298,
+    breachWeeks: [0.060, 0.150, 0.124, 0.354, 0.525, 0.518, 0.468, 0.354, 0.288, 0.185, 0.198, 0.111, 0.069],
+    cvarLakh: 28.56,
+    note: "One customer is 28.5% of last year's sales and owes ₹40.8 L across 43 open invoices. The P10 path goes below zero in week four.",
   },
 ];
 
@@ -145,7 +154,7 @@ export function ProductPreview() {
               </span>
             </div>
             <span className="hidden font-mono text-[10px] text-muted-foreground/60 sm:inline">
-              as of 2 Mar 2026
+              as of 7 Nov 2026
             </span>
           </div>
 
@@ -179,20 +188,20 @@ export function ProductPreview() {
             <div className="grid gap-4 sm:grid-cols-2 lg:col-span-4 lg:grid-cols-1">
               <Stat
                 label="Available cash"
-                value={inr(BASE.p50[0], { compact: true })}
-                sub="Reconciled across 4 accounts"
+                value={inr(AVAILABLE_CASH, { compact: true })}
+                sub="Reconciled across 3 accounts"
                 icon={<Wallet className="size-4" />}
                 state="actual"
                 footer={
                   <span className="font-mono text-[10px] text-muted-foreground">
-                    1,842 txns
+                    1,864 txns
                   </span>
                 }
               />
               <Stat
                 label="Runway (P10)"
                 value={fmtWeeks(s.runwayP10)}
-                sub={simulated ? "Against a ₹2.50L buffer" : "Pessimistic decile"}
+                sub={simulated ? "Against a ₹3.00L buffer" : "Pessimistic decile"}
                 icon={<CircleDollarSign className="size-4" />}
                 state={simulated ? "simulated" : "predicted"}
                 tone={s.runwayP10 < 6 ? "loss" : "gain"}
@@ -257,7 +266,8 @@ export function ProductPreview() {
             {/* health + evidence */}
             <Panel
               className="lg:col-span-3"
-              title="Health"
+              title="Health · today"
+              description="Scored on the ledger, so a scenario does not change it."
               bodyClass="grid place-items-center p-3"
             >
               <motion.div
@@ -266,7 +276,7 @@ export function ProductPreview() {
                 animate={{ opacity: 1, scale: 1 }}
                 transition={{ duration: 0.45, ease: EASE_OUT }}
               >
-                <HealthGauge score={s.health} size={128} />
+                <HealthGauge score={HEALTH_TODAY} size={128} />
               </motion.div>
             </Panel>
 
@@ -280,9 +290,9 @@ export function ProductPreview() {
                 dense
                 items={[
                   { label: "Weekly min cash (P10)", value: inr(Math.min(...(s.overlay?.p10 ?? BASE.p10)), { compact: true }) },
-                  { label: "Liquidity CVaR₉₅", value: inr(L(s.id === "concentration" ? 31.4 : s.id === "supplier" ? 3.9 : 13.67), { compact: true }) },
+                  { label: "Liquidity CVaR₉₅", value: inr(L(s.cvarLakh), { compact: true }) },
                   { label: "Receivables outstanding", value: inr(L(100.33), { compact: true }) },
-                  { label: "MSMED-exposed payables", value: inr(L(48.59), { compact: true }) },
+                  { label: "MSMED-exposed payables", value: inr(L(28.37), { compact: true }) },
                 ]}
               />
             </Panel>
@@ -291,7 +301,7 @@ export function ProductPreview() {
           {/* provenance strip — the app shows one on every computed screen */}
           <div className="border-t border-border px-4 py-2.5">
             <Provenance>
-              ledger fingerprint <code className="font-mono">8f2c41ab…</code> · 4,000 paths ·
+              ledger fingerprint <code className="font-mono">660ab0d5…</code> · 4,000 paths ·
               seed shared with baseline · split-conformal P10–P90, 84% empirical coverage ·
               {simulated ? " nothing written to the ledger" : " no scenario applied"}
             </Provenance>

@@ -32,19 +32,22 @@ import { cn } from "@/lib/utils";
 
 /* ── the demo tenant's numbers, in paise ──────────────────────────────── */
 const L = (lakh: number) => Math.round(lakh * 100_000 * 100);
+/* Copied from the running engine for demo scenario B as of 2026-11-07
+   (engine 0.9.0, 4,000 paths, seed 20260101). Week 0 is the as-of date.
+   Re-pull these from the API if the seed or engine changes; never hand-tune. */
 const WEEKS = [
-  "2026-11-09", "2026-11-16", "2026-11-23", "2026-11-30", "2026-12-07",
-  "2026-12-14", "2026-12-21", "2026-12-28", "2027-01-04", "2027-01-11",
-  "2027-01-18", "2027-01-25", "2027-02-01",
+  "2026-11-07", "2026-11-14", "2026-11-21", "2026-11-28", "2026-12-05",
+  "2026-12-12", "2026-12-19", "2026-12-26", "2027-01-02", "2027-01-09",
+  "2027-01-16", "2027-01-23", "2027-01-30", "2027-02-06",
 ];
 const HERO_SERIES: CashSeries = {
   week_starts: WEEKS,
-  p50: [4.77, 6.10, 7.35, 6.90, 8.30, 9.55, 11.20, 10.40, 12.10, 13.80, 15.20, 14.60, 16.90].map(L),
-  p10: [4.77, 4.55, 4.10, 3.52, 3.00, 2.41, 1.95, 1.60, 1.88, 2.30, 2.85, 2.60, 3.20].map(L),
-  p90: [4.77, 8.00, 11.30, 11.90, 15.10, 18.40, 21.60, 20.90, 24.20, 26.80, 29.40, 28.70, 32.10].map(L),
-  safety_buffer_paise: L(2.5),
+  p50: [9.07, 16.86, 21.02, 26.07, 23.55, 19.65, 18.99, 19.58, 23.46, 25.38, 28.27, 25.22, 27.47, 27.30].map(L),
+  p10: [9.07, 6.48, 6.71, 10.34, 8.49, 6.41, 5.07, 4.77, 7.24, 8.94, 11.96, 9.36, 12.18, 12.53].map(L),
+  p90: [9.07, 32.39, 35.49, 38.44, 36.27, 33.49, 33.94, 36.23, 40.44, 42.93, 45.60, 42.05, 44.45, 43.72].map(L),
+  safety_buffer_paise: L(3),
 };
-const SPARK = [4.77, 6.1, 7.35, 6.9, 8.3, 9.55, 11.2, 10.4, 12.1, 13.8, 15.2, 14.6, 16.9].map(L);
+const SPARK = HERO_SERIES.p50;
 
 const NAV_LINKS = [
   ["#why", "Why RUNWAY"],
@@ -240,9 +243,9 @@ function HeroDashboard() {
           </ul>
           <div className="mt-auto rounded-lg border border-border bg-card p-2.5">
             <p className="text-[9px] uppercase tracking-wider text-muted-foreground">Data quality</p>
-            <p className="mt-1 font-display text-lg font-semibold tnum">94<span className="text-xs text-muted-foreground">/100</span></p>
+            <p className="mt-1 font-display text-lg font-semibold tnum">98<span className="text-xs text-muted-foreground">/100</span></p>
             <div className="mt-2 h-1 overflow-hidden rounded-full bg-surface">
-              <div className="h-full w-[94%] rounded-full bg-primary-bright" />
+              <div className="h-full w-[98%] rounded-full bg-primary-bright" />
             </div>
           </div>
         </div>
@@ -263,10 +266,10 @@ function HeroDashboard() {
           </div>
 
           <div className="mt-5 grid grid-cols-2 gap-3 lg:grid-cols-4">
-            <MiniStat label="Available cash" value="₹4,77,221" note="Across 4 accounts · actual" state="actual" />
-            <MiniStat label="Receivables" value="₹1,00,32,867" note="42 invoices · ₹18.7L overdue" state="actual" tone="warn" />
-            <MiniStat label="Payables" value="₹11,40,000" note="27 invoices · actual" state="actual" />
-            <MiniStat label="Runway P10" value="4.85 wk" note="17% chance of buffer breach" state="predicted" tone="gain" />
+            <MiniStat label="Available cash" value="₹4,77,221" note="Across 3 accounts · actual" state="actual" />
+            <MiniStat label="Receivables" value="₹1,00,32,867" note="102 invoices · ₹35.8L overdue" state="actual" tone="warn" />
+            <MiniStat label="Payables" value="₹29,46,239" note="15 invoices · actual" state="actual" />
+            <MiniStat label="Runway P10" value="4.85 wk" note="22% chance of buffer breach" state="predicted" tone="warn" />
           </div>
 
           <div className="mt-4 grid gap-4 lg:grid-cols-[1.65fr_1fr]">
@@ -274,7 +277,7 @@ function HeroDashboard() {
               <div className="flex flex-wrap items-start justify-between gap-2">
                 <div>
                   <p className="text-[12px] font-semibold">Thirteen-week cash position</p>
-                  <p className="mt-0.5 text-[10.5px] text-muted-foreground">4,000 paths · P10–P90 band · buffer ₹2.50 L</p>
+                  <p className="mt-0.5 text-[10.5px] text-muted-foreground">4,000 paths · P10–P90 band · buffer ₹3.00 L</p>
                 </div>
                 <StateBadge state="predicted" />
               </div>
@@ -290,12 +293,12 @@ function HeroDashboard() {
               </div>
               <h4 className="mt-2 font-editorial text-[21px] leading-tight">Negotiate a 30% advance</h4>
               <p className="mt-1.5 text-[11px] leading-relaxed text-muted-foreground text-pretty">
-                On the ₹15 L order, this closes the 51-day funding gap before materials are due.
+                On the ₹15 L order, this cuts the cash tied up in the 51-day funding gap from ₹12.3 L to ₹7.8 L.
               </p>
               <dl className="mt-4 space-y-2 text-[11px]">
                 {[
-                  ["Minimum cash (P10)", "₹2.1 L → ₹6.2 L"],
-                  ["Breach probability", "54% → 35%"],
+                  ["Minimum cash (P10)", "−₹12.2 L → −₹7.4 L"],
+                  ["Breach probability", "60% → 42%"],
                   ["Scenario isolation", "Nothing written to ledger"],
                 ].map(([k, v]) => (
                   <div key={k} className="flex items-start justify-between gap-3 border-b border-border/70 pb-2 last:border-0">
@@ -315,7 +318,7 @@ function HeroDashboard() {
             <span className="flex items-center gap-1.5"><span className="h-0.5 w-5 rounded bg-state-actual" /> Actual · solid</span>
             <span className="flex items-center gap-1.5"><span className="h-2 w-5 rounded bg-state-predicted-soft" /> Predicted · band</span>
             <span className="flex items-center gap-1.5"><span className="h-0.5 w-5 rounded border-t-2 border-dashed border-state-simulated" /> Simulated · dashed</span>
-            <span className="ml-auto font-mono">fingerprint 8f2c41ab…</span>
+            <span className="ml-auto font-mono">fingerprint 660ab0d5…</span>
           </div>
         </div>
       </div>
@@ -330,11 +333,11 @@ function DataTicker() {
     ["Available cash", "₹4,77,221", "actual"],
     ["Receivables", "₹1,00,32,867", "actual"],
     ["Runway P10", "4.85 weeks", "predicted"],
-    ["Breach probability", "17%", "predicted"],
-    ["Liquidity CVaR₉₅", "₹13,67,426", "predicted"],
+    ["Breach probability", "22%", "predicted"],
+    ["Liquidity CVaR₉₅", "₹12,33,721", "predicted"],
     ["ABC Distributors", "+22.4 days", "actual"],
     ["Health score", "72.8 / 100", "predicted"],
-    ["MSMED exposed", "₹48,58,621", "actual"],
+    ["MSMED exposed", "₹28,37,385", "actual"],
   ] as const;
   return (
     <div className="relative mt-20 border-y border-border bg-card/60 py-3.5 sm:mt-28">
@@ -441,7 +444,7 @@ function Instrument() {
                   checked on every build. Debits equal credits; no orphan rows;
                   no negative money objects.
                 </p>
-                <p className="mt-3 font-mono text-[10px] text-muted-foreground">ledger fp · 8f2c41ab…</p>
+                <p className="mt-3 font-mono text-[10px] text-muted-foreground">ledger fp · 660ab0d5…</p>
               </div>
             </div>
           </BentoCard></Reveal>
@@ -492,13 +495,13 @@ function Instrument() {
             <div className="mt-4 grid grid-cols-2 gap-2">
               <div className="rounded-lg border border-border bg-card p-3">
                 <p className="atelier-eyebrow atelier-eyebrow-sm">Min cash P10</p>
-                <p className="mt-1.5 font-display text-xl font-semibold tnum">₹2.1 L</p>
+                <p className="mt-1.5 font-display text-xl font-semibold tnum text-fin-loss">−₹12.2 L</p>
                 <p className="text-[10px] text-muted-foreground">as-is</p>
               </div>
               <div className="rounded-lg border border-fin-gain/30 bg-fin-gain-soft p-3">
                 <p className="atelier-eyebrow atelier-eyebrow-sm">Min cash P10</p>
-                <p className="mt-1.5 font-display text-xl font-semibold tnum text-fin-gain">₹6.2 L</p>
-                <p className="text-[10px] text-fin-gain">with advance ↑</p>
+                <p className="mt-1.5 font-display text-xl font-semibold tnum text-fin-warn">−₹7.4 L</p>
+                <p className="text-[10px] text-muted-foreground">with 30% advance</p>
               </div>
             </div>
             <p className="mt-3 text-[11.5px] leading-relaxed text-muted-foreground text-pretty">
@@ -511,10 +514,10 @@ function Instrument() {
               <div className="rounded-lg border border-border bg-card p-3">
                 <p className="atelier-eyebrow atelier-eyebrow-sm">Evidence trail</p>
                 {[
-                  ["Invoice INV-1042", "₹2,40,000"],
-                  ["Bank UTR 4481…", "₹2,40,000"],
-                  ["GST GSTR-1 row 18", "matched"],
-                  ["Duplicate score", "0.02"],
+                  ["Invoice INV-1846", "₹61,626"],
+                  ["Bank NEFT 4159…", "₹61,626"],
+                  ["Settled", "6 Nov 2026"],
+                  ["Match confidence", "0.99"],
                 ].map(([k, v], i) => (
                   <div key={k} className="mt-2 flex items-center justify-between gap-3 border-b border-border/60 pb-1.5 text-[11.5px] last:border-0">
                     <span className="flex items-center gap-2 text-muted-foreground">
@@ -542,8 +545,8 @@ function Instrument() {
               </div>
               <div className="rounded-lg rounded-tl-sm border border-primary/25 bg-primary-soft p-3">
                 <p className="text-[11.5px] leading-relaxed">
-                  Runway falls to <strong className="tnum">2.6 weeks</strong> and breach
-                  probability rises to <strong className="tnum">58%</strong>.
+                  Runway (P10) falls from 4.85 to <strong className="tnum">1.5 weeks</strong> and breach
+                  probability rises from 22% to <strong className="tnum">73%</strong>.
                 </p>
                 <p className="mt-2 font-mono text-[9.5px] text-muted-foreground">
                   tool: customer_delay · verified against deterministic output
@@ -663,16 +666,17 @@ function States() {
 
 /* ───────────────────────── decision story ───────────────────── */
 
-const BASE_PATH = [11.1, 12.4, 13.8, 12.9, 11.6, 11.1, 11.3, 12.8, 14.6, 16.2, 18.1, 17.0, 19.3];
-const GAP_PATH = [11.1, 12.4, 10.2, 5.1, 2.1, 1.8, 2.4, 3.9, 6.2, 9.8, 13.4, 15.1, 18.9];
-const FIXED_PATH = GAP_PATH.map((v, i) => v + [0, 0, 2.6, 4.2, 4.4, 4.0, 3.4, 2.6, 1.8, 1.0, .4, .2, 0][i]);
+// Weekly P10 cash (₹ lakh), quick-run new_order ₹15 L, 18% margin, 60-day terms.
+const BASE_PATH = [9.07, 6.48, 6.71, 10.34, 8.49, 6.41, 5.07, 4.77, 7.24, 8.94, 11.96, 9.36, 12.18, 12.53];
+const GAP_PATH = [9.07, 6.41, 6.78, 10.62, 9.12, 3.17, -6.92, -7.55, -4.94, -3.42, 0.09, -2.26, 1.42, 6.68];
+const FIXED_PATH = [9.07, 8.11, 10.99, 14.92, 13.37, 8.08, -2.12, -2.79, -0.32, 1.31, 4.58, 1.80, 5.52, 8.13];
+const CHART_MIN = -10, CHART_MAX = 16, BUFFER_LAKH = 3;
 const W = 640, H = 300, PAD = 30;
+const yFor = (v: number) => H - PAD - ((v - CHART_MIN) / (CHART_MAX - CHART_MIN)) * (H - PAD * 2);
 function pathFor(series: number[]) {
-  const max = 21, min = 0;
   return series.map((v, i) => {
     const x = PAD + (i / (series.length - 1)) * (W - PAD * 2);
-    const y = H - PAD - ((v - min) / (max - min)) * (H - PAD * 2);
-    return `${i ? "L" : "M"}${x.toFixed(1)},${y.toFixed(1)}`;
+    return `${i ? "L" : "M"}${x.toFixed(1)},${yFor(v).toFixed(1)}`;
   }).join(" ");
 }
 
@@ -709,21 +713,21 @@ function DecisionStory() {
           <div className="mt-8 grid grid-cols-2 gap-4 border-t border-border pt-6">
             <div>
               <p className="atelier-eyebrow atelier-eyebrow-sm">Minimum cash (P10)</p>
-              <p className={cn("mt-1.5 font-display text-3xl font-semibold tracking-tight tnum", lever ? "text-fin-loss" : "text-fin-gain")}>
-                {lever ? "₹2.1 L" : "₹6.2 L"}
+              <p className={cn("mt-1.5 font-display text-3xl font-semibold tracking-tight tnum", lever ? "text-fin-loss" : "text-fin-warn")}>
+                {lever ? "−₹12.2 L" : "−₹7.4 L"}
               </p>
             </div>
             <div>
               <p className="atelier-eyebrow atelier-eyebrow-sm">Breach probability</p>
-              <p className={cn("mt-1.5 font-display text-3xl font-semibold tracking-tight tnum", lever ? "text-fin-loss" : "text-fin-gain")}>
-                {lever ? "54%" : "35%"}
+              <p className={cn("mt-1.5 font-display text-3xl font-semibold tracking-tight tnum", lever ? "text-fin-loss" : "text-fin-warn")}>
+                {lever ? "60%" : "42%"}
               </p>
             </div>
           </div>
           <p className="mt-5 max-w-md text-[12.5px] leading-relaxed text-muted-foreground text-pretty">
             {lever
               ? "Materials are payable on day 37; the balance arrives on day 88. For 51 days the business funds somebody else's inventory."
-              : "Same order, same margin. The advance closes the gap before it opens — and the scenario never touches the ledger."}
+              : "Same order, same margin. The advance brings ₹4.5 L in up front, so the gap shrinks from ₹12.3 L to ₹7.8 L. It does not close: the P10 path still dips below zero. The scenario never touches the ledger."}
           </p>
         </Reveal>
 
@@ -731,7 +735,7 @@ function DecisionStory() {
           <div className="rw-sidebar atelier-ink-panel rounded-2xl border border-sidebar-border p-5 sm:p-7">
             <div className="flex flex-wrap items-center justify-between gap-3">
               <div>
-                <p className="atelier-eyebrow atelier-eyebrow-muted">Cash position · ₹ lakh</p>
+                <p className="atelier-eyebrow atelier-eyebrow-muted">Downside cash (P10) · ₹ lakh</p>
                 <p className="mt-1 text-[12px] text-sidebar-muted">13 weeks from the as-of date</p>
               </div>
               <div className="flex flex-wrap gap-3 text-[10.5px] text-sidebar-muted">
@@ -741,15 +745,15 @@ function DecisionStory() {
             </div>
 
             <svg viewBox={`0 0 ${W} ${H}`} className="mt-5 w-full" role="img"
-                 aria-label={lever ? "Cash position dips sharply when the order is accepted as-is" : "Cash position recovers when a 30 percent advance is negotiated"}>
-              {[0, 5, 10, 15, 20].map((v) => {
-                const y = H - PAD - (v / 21) * (H - PAD * 2);
+                 aria-label={lever ? "Downside cash falls to minus 7.6 lakh when the order is accepted as-is" : "With a 30 percent advance, downside cash still dips, to minus 2.8 lakh"}>
+              {[-10, -5, 0, 5, 10, 15].map((v) => {
+                const y = yFor(v);
                 return <g key={v}>
                   <line x1={PAD} x2={W - PAD} y1={y} y2={y} stroke="var(--sidebar-border)" strokeWidth="1" />
                   <text x={PAD - 8} y={y + 3} textAnchor="end" fontSize="9" fill="var(--sidebar-muted)">{v}</text>
                 </g>;
               })}
-              <line x1={PAD} x2={W - PAD} y1={H - PAD - (2.5 / 21) * (H - PAD * 2)} y2={H - PAD - (2.5 / 21) * (H - PAD * 2)}
+              <line x1={PAD} x2={W - PAD} y1={yFor(BUFFER_LAKH)} y2={yFor(BUFFER_LAKH)}
                     stroke="var(--fin-warn)" strokeWidth="1" strokeDasharray="4 4" />
               <motion.path key={`base-${mode}`} d={pathFor(BASE_PATH)} fill="none"
                            stroke="var(--primary-bright)" strokeWidth="2.4" strokeLinecap="round"
@@ -758,17 +762,17 @@ function DecisionStory() {
                            stroke={lever ? "var(--fin-loss)" : "var(--fin-gain)"} strokeWidth="2.8" strokeLinecap="round"
                            initial={{ opacity: 0, pathLength: 0 }} animate={{ opacity: 1, pathLength: 1 }}
                            transition={{ duration: .8, ease: EASE_OUT }} />
-              {[0, 4, 8, 12].map((i) => (
-                <text key={i} x={PAD + (i / 12) * (W - PAD * 2)} y={H - 8}
-                      textAnchor="middle" fontSize="9" fill="var(--sidebar-muted)">W{i + 1}</text>
+              {[0, 4, 8, 13].map((i) => (
+                <text key={i} x={PAD + (i / 13) * (W - PAD * 2)} y={H - 8}
+                      textAnchor="middle" fontSize="9" fill="var(--sidebar-muted)">{i ? `W${i}` : "Now"}</text>
               ))}
             </svg>
 
             <div className="mt-4 grid gap-3 border-t border-border pt-4 sm:grid-cols-3">
               {[
                 ["Order value", "₹15.00 L"],
-                ["Funding gap", lever ? "51 days" : "closed"],
-                ["First breach", lever ? "week 6" : "beyond W13"],
+                ["Cash tied up", lever ? "₹12.3 L" : "₹7.8 L"],
+                ["Funding gap", "51 days"],
               ].map(([k, v]) => (
                 <div key={k}>
                   <p className="atelier-eyebrow atelier-eyebrow-sm atelier-eyebrow-muted">{k}</p>
