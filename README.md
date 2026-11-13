@@ -34,7 +34,7 @@ be mistaken for a bank balance.
 ## Quick start
 
 ```bash
-git clone https://github.com/SHOCKER5919Q/runway-innovasia-2k26.git
+git clone https://github.com/Salahuddin-13/runway-innovasia-2k26.git
 cd runway-innovasia-2k26
 
 ./run.sh setup          # create the venv, install everything, seed the demo
