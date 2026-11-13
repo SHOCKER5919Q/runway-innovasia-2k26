@@ -30,6 +30,19 @@ def import_file(db, *, business_id: str, account_id: str, adapter_key: str,
         raise ValueError("account not found in this business")
 
     parsed, report = adapter.parse(content, filename=filename)
+    # Wrong importer picked? An invoice register (Invoice No + Customer /
+    # Supplier Name) sent to the bank-statement reader yields no rows. Detect
+    # it and use the invoice-register reader instead, saying so.
+    if not parsed and adapter_key in ("bank_csv", "upi_settlement_csv"):
+        head = content[:600].decode("utf-8-sig", errors="replace").lower()
+        if "invoice" in head and any(k in head for k in ("customer", "supplier", "party", "gstin")):
+            alt = REGISTRY.get("gst_invoice_json")
+            p2, r2 = alt.parse(content, filename=filename)
+            if p2:
+                parsed, report, adapter_key = p2, r2, "gst_invoice_json"
+                report.warnings.insert(0, "This file is an invoice register, not a bank "
+                                          "statement - it was read with the GST invoice "
+                                          "register importer instead.")
     batch = ImportBatch(id=_uid(), business_id=business_id, adapter=adapter_key,
                         filename=filename, status="parsed",
                         rows_seen=report.rows_seen, rows_rejected=report.rows_rejected,
