@@ -11,7 +11,7 @@ from sqlalchemy import select
 from app.api.common import jsonable, money, today_param
 from app.api.deps import DbDep, Tenant, audit, resolved_as_of
 from app.core.enums import Role, StateType
-from app.digital_twin.digital_twin_service import get_bundle
+from app.digital_twin.digital_twin_service import get_bundle, invalidate
 from app.models import (
     ActualSnapshot, Alert, BusinessState, PredictedSnapshot, Recommendation,
     SimulatedSnapshot, TwinEvent,
@@ -276,15 +276,15 @@ def recommendations(db: DbDep, ctx: Tenant, as_of: AsOf):
     done = [r for r in b.recommendations if _st(r) == "done"]
     lift_a = sum(max(0, r.expected_effect_paise or 0) for r in approved)
     lift_d = sum(max(0, r.expected_effect_paise or 0) for r in done)
-    lift = lift_a + lift_d
+    lift = lift_a          # done actions are already recorded in cash
     avail = b.position.available_liquidity_paise
     plan = {"approved": len(approved) + len(done), "in_progress": len(approved),
             "done": len(done), "codes": [r.code for r in approved + done],
             "in_progress_lift": money(lift_a), "done_lift": money(lift_d),
             "available_now": money(avail), "expected_lift": money(lift),
             "available_if_done": money(avail + lift),
-            "note": ("Projected. Marked-done actions stay counted until the next bank "
-                     "statement confirms the money; then they show in recorded cash.")}
+            "note": ("Projected for approved actions. Marking one done records the money "
+                     "in the ledger (owner-confirmed), so it moves into cash now.")}
     return jsonable({
         "as_of": as_of.isoformat(),
         "approved_plan": plan,
@@ -309,7 +309,7 @@ class RecAction(BaseModel):
 
 
 @router.post("/recommendations/{code}/status")
-def set_rec_status(code: str, body: RecAction, db: DbDep, ctx: Tenant):
+def set_rec_status(code: str, body: RecAction, db: DbDep, ctx: Tenant, as_of: AsOf):
     ctx.require(Role.MANAGER)
     if body.status not in ("open", "accepted", "dismissed", "done"):
         raise HTTPException(422, "invalid status")
@@ -317,11 +317,22 @@ def set_rec_status(code: str, body: RecAction, db: DbDep, ctx: Tenant):
         Recommendation.business_id == ctx.business_id, Recommendation.code == code))
     if not row:
         raise HTTPException(404, "Recommendation not found")
+    prev = row.status
     row.status = body.status
+    ledger = None
+    from app.recommend import actions
+    if body.status == "done" and prev != "done":
+        # "Done" on a cash action means the money moved: record it.
+        ledger = actions.record_done(db, business_id=ctx.business_id, rec=row,
+                                     as_of=as_of, user_id=ctx.user.id)
+    elif prev == "done" and body.status != "done":
+        ledger = actions.undo_done(db, business_id=ctx.business_id, code=code)
     audit(db, ctx, "recommendation.status", entity="recommendation", entity_id=row.id,
-          detail={"code": code, "status": body.status})
+          detail={"code": code, "status": body.status, "ledger": ledger})
     db.commit()
-    return {"ok": True, "code": code, "status": body.status}
+    if ledger:
+        invalidate(ctx.business_id)
+    return jsonable({"ok": True, "code": code, "status": body.status, "ledger": ledger})
 
 
 @router.post("/alerts/{alert_id}/acknowledge")

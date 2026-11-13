@@ -16,10 +16,25 @@ export default function RecommendationsPage() {
   const [open, setOpen] = useState<string | null>(null);
   const [busy, setBusy] = useState<string | null>(null);
 
+  const [notice, setNotice] = useState<string | null>(null);
+
   async function setStatus(code: string, status: string) {
-    setBusy(code);
-    try { await api.post(`/api/recommendations/${code}/status`, { status }); reload(); }
-    finally { setBusy(null); }
+    setBusy(code); setNotice(null);
+    try {
+      const r = await api.post<any>(`/api/recommendations/${code}/status`, { status });
+      const l = r?.ledger;
+      if (l?.rows?.length) {
+        const total = inr(l.total_paise);
+        setNotice(`Recorded in the ledger: ${l.rows.length} ${l.direction === "credit" ? "receipts" : "payments"} `
+          + `totalling ${total} (${l.rows.map((x: any) => x.invoice_no).join(", ")}). Cash, receivables and `
+          + `payables are updated. Owner-confirmed until the bank statement arrives; Undo removes it.`);
+      } else if (l?.undone_entries) {
+        setNotice("Undone: the recorded money was taken back out of the ledger.");
+      } else if (l?.reason) {
+        setNotice(l.reason);
+      }
+      reload();
+    } finally { setBusy(null); }
   }
 
   if (error) return <ErrorState message={error} onRetry={reload} />;
@@ -35,6 +50,12 @@ export default function RecommendationsPage() {
         <ShieldCheck className="mt-0.5 size-4 shrink-0 text-fin-gain" aria-hidden />
         <p className="text-xs leading-relaxed text-muted-foreground text-pretty">{data.guarantee}</p>
       </div>
+
+      {notice && (
+        <p role="status" className="rounded-lg border border-fin-gain/30 bg-fin-gain-soft px-4 py-2.5 text-[13px] text-fin-gain">
+          {notice}
+        </p>
+      )}
 
       {data.approved_plan && (
         <div className="rw-card grid gap-4 p-5 sm:grid-cols-[1fr_auto_1fr_auto_1fr] sm:items-center">
@@ -115,7 +136,7 @@ export default function RecommendationsPage() {
                       r.status === "accepted" ? "border-fin-gain/30 bg-fin-gain-soft text-fin-gain"
                         : r.status === "done" ? "border-fin-gain/30 bg-fin-gain-soft text-fin-gain"
                         : "border-border bg-surface text-muted-foreground")}>
-                      <Check className="size-3" /> {r.status === "accepted" ? "Approved - in progress" : r.status}
+                      <Check className="size-3" /> {r.status === "accepted" ? "Approved - in progress" : r.status === "done" ? "Done - recorded" : r.status}
                     </span>
                     {r.status === "accepted" && (
                       <button onClick={() => setStatus(r.code, "done")} disabled={busy === r.code}
