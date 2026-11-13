@@ -343,7 +343,7 @@ export default function IntegrationsPage() {
         </Panel>
       </div>
 
-      <ImportHistory batches={batches.data?.batches ?? []} />
+      <ImportHistory batches={batches.data?.batches ?? []} onChange={batches.reload} />
     </div>
   );
 }
@@ -352,9 +352,20 @@ export default function IntegrationsPage() {
 /* Every upload is kept - the ledger only ever grows, like a bank passbook -
    and each one records the headline figures just before and just after it,
    so any past upload can be opened and compared with today. */
-function ImportHistory({ batches }: { batches: any[] }) {
+function ImportHistory({ batches, onChange }: { batches: any[]; onChange?: () => void }) {
   const [open, setOpen] = useState<string | null>(null);
   const [detail, setDetail] = useState<any>(null);
+  const [reverting, setReverting] = useState<string | null>(null);
+
+  async function revert(b: any) {
+    if (!window.confirm(`Take "${b.filename}" back out of the ledger? Its ${b.rows_imported} rows ` +
+                        "are removed and any invoices it paid are reopened. The upload stays in " +
+                        "history, marked reverted.")) return;
+    setReverting(b.id);
+    try { await api.post(`/api/integrations/batches/${b.id}/revert`, {}); onChange?.(); }
+    catch (e: any) { window.alert(e?.message ?? "Could not revert this upload"); }
+    finally { setReverting(null); }
+  }
 
   async function toggle(id: string) {
     if (open === id) { setOpen(null); return; }
@@ -406,7 +417,15 @@ function ImportHistory({ batches }: { batches: any[] }) {
                     <td className="py-2 text-right tnum">{b.rows_imported}</td>
                     <td className="py-2 text-right tnum">{b.rows_duplicate}</td>
                     <td className="py-2 text-right tnum text-[12px]">{cash ? delta(cash) : "—"}</td>
-                    <td className="py-2 text-right">
+                    <td className="py-2 text-right whitespace-nowrap">
+                      {b.status === "reverted" ? (
+                        <span className="pill mr-1">reverted</span>
+                      ) : b.rows_imported > 0 && (
+                        <button className="btn btn-ghost btn-sm mr-1" disabled={reverting === b.id}
+                                onClick={() => revert(b)} title="Undo this upload">
+                          {reverting === b.id ? "Reverting…" : "Revert"}
+                        </button>
+                      )}
                       <button className="btn btn-ghost btn-sm" onClick={() => toggle(b.id)}
                               aria-expanded={open === b.id}>
                         {open === b.id ? "Hide" : "Open"}

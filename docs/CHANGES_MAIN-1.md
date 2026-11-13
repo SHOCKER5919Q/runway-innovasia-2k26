@@ -37,6 +37,11 @@ team PR fixing the Scenario Lab, risk-alert keys and Windows dates.
    payables, MSMED, customer delays now point-in-time).
 8. Payments to suppliers named "...Logistics" never settled their bill.
 9. Committing a PDF invoice import always crashed (date in JSON).
+13. A file from another account or era (e.g. the 2010 UCI CSV loaded into the
+    2025 demo account) was booked in full and wrecked every figure; rows
+    outside the account's life are now refused, and any upload can be
+    **reverted** from Import history (kept in history as "reverted").
+14. Chart tooltips showed "₹NaN" for the P10–P90 band.
 10. GSTR-1 "b2b" files were booked as purchases.
 11. GST imports stored party names in the GSTIN field.
 12. Recurring costs understated ~3x for ledgers shorter than 26 weeks.

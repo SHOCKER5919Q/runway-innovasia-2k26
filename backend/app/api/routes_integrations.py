@@ -11,6 +11,7 @@ from app.api.deps import DbDep, Tenant, audit
 from app.core.enums import Role
 from app.digital_twin.digital_twin_service import invalidate
 from app.integrations.history import import_with_impact
+from app.ledger.reconciliation import refresh_overdue
 from app.integrations.service import catalogue, import_file
 from app.models import Account, ImportBatch, Transaction
 
@@ -35,6 +36,24 @@ def batches(db: DbDep, ctx: Tenant, limit: int = Query(30, le=200)):
         "created_at": b.created_at.isoformat(), "report": b.report_json,
         "impact": (b.report_json or {}).get("impact"),
         "errors": (b.errors_json or [])[:20]} for b in rows]})
+
+
+@router.post("/batches/{batch_id}/revert")
+def revert(batch_id: str, db: DbDep, ctx: Tenant, as_of: AsOf):
+    """Undo a wrong upload (wrong file, wrong account, wrong business)."""
+    ctx.require(Role.MANAGER)
+    b = db.get(ImportBatch, batch_id)
+    if not b or b.business_id != ctx.business_id:
+        raise HTTPException(404, "Import not found")
+    if b.status == "reverted":
+        raise HTTPException(409, "This upload was already reverted")
+    from app.integrations.service import revert_batch
+    res = revert_batch(db, b)
+    refresh_overdue(db, ctx.business_id, as_of)
+    audit(db, ctx, "import.revert", entity="import_batch", entity_id=b.id, detail=res)
+    db.commit()
+    invalidate(ctx.business_id)
+    return jsonable({"batch_id": b.id, "status": b.status, **res})
 
 
 @router.get("/batches/{batch_id}")

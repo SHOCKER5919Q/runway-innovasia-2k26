@@ -73,7 +73,11 @@ export function ChartTip({ active, payload, label, labelFormat, valueFormat }: a
               <span className="text-muted-foreground">{p.name}</span>
             </span>
             <span className="font-medium tnum">
-              {valueFormat ? valueFormat(p.value, p) : inr(p.value)}
+              {/* A band (e.g. P10-P90) arrives as [low, high]; formatting the
+                  pair as one number printed "₹NaN". */}
+              {Array.isArray(p.value)
+                ? p.value.map((v: number) => (valueFormat ? valueFormat(v, p) : inr(v))).join(" – ")
+                : valueFormat ? valueFormat(p.value, p) : inr(p.value)}
             </span>
           </div>
         ))}

@@ -1,7 +1,7 @@
 """Import pipeline: parse -> dedupe -> resolve -> classify -> reconcile."""
 from __future__ import annotations
 
-from datetime import date
+from datetime import date, timedelta
 from typing import Any
 
 from sqlalchemy import select
@@ -42,6 +42,7 @@ def import_file(db, *, business_id: str, account_id: str, adapter_key: str,
     # database would let an in-file duplicate through on a dry run, where
     # nothing has been flushed yet.
     seen_in_batch: dict[str, int] = {}
+    out_of_range = 0
 
     for item in parsed:
         if isinstance(item, NormalisedRow):
@@ -52,6 +53,27 @@ def import_file(db, *, business_id: str, account_id: str, adapter_key: str,
             row, kind = item, "invoice"
         else:
             continue
+
+        if kind == "transaction":
+            # Guard: a statement row must fall inside this account's life.
+            # A file for another business or another era (e.g. a 2010 export
+            # loaded into an account opened in 2025) would otherwise be booked
+            # in full and rewrite every figure. Such rows are refused with a
+            # reason instead.
+            why = None
+            if account.opening_date and row.value_date < account.opening_date:
+                why = (f"dated {row.value_date.isoformat()}, before this account was opened "
+                       f"({account.opening_date.isoformat()}) - is this the right account "
+                       f"or business?")
+            elif today and row.value_date > today + timedelta(days=1):
+                why = (f"dated {row.value_date.isoformat()}, after the as-of date "
+                       f"{today.isoformat()}")
+            if why:
+                report.rows_rejected += 1
+                out_of_range += 1
+                if len(report.errors) < 100:
+                    report.errors.append({"row": None, "date": row.value_date.isoformat(), "error": why})
+                continue
 
         if kind == "invoice":
             inv, note = _build_invoice(db, business_id, row, cache)
@@ -154,7 +176,14 @@ def import_file(db, *, business_id: str, account_id: str, adapter_key: str,
         db.add(batch)
         db.flush()
 
+    if out_of_range:
+        report.warnings.append(
+            f"{out_of_range} rows were refused because their dates fall outside this "
+            f"account's life. Nothing from those rows was written.")
+        batch.rows_rejected = report.rows_rejected
+        batch.errors_json = _json_safe(report.errors[:100])
     batch.report_json = _json_safe({
+        "invoice_ids": [i.id for i in created_inv],
         "detected_format": report.detected_format,
         "column_mapping": report.column_mapping,
         "warnings": report.warnings,
@@ -240,3 +269,51 @@ def _json_safe(v):
     if isinstance(v, (_date, _datetime)):
         return v.isoformat()
     return v
+
+
+
+def revert_batch(db, batch) -> dict:
+    """Take one upload back out of the ledger.
+
+    The batch record itself stays in import history, marked ``reverted``, so
+    the audit trail still shows the file was loaded and then withdrawn.
+    Settlements its payments made are reversed, so invoices it paid are open
+    again; invoices it created are removed.
+    """
+    from app.models import Allocation
+    txns = db.scalars(select(Transaction).where(Transaction.import_batch_id == batch.id)).all()
+    reopened = set()
+    for t in txns:
+        for a in db.scalars(select(Allocation).where(Allocation.transaction_id == t.id)).all():
+            inv = db.get(Invoice, a.invoice_id)
+            if inv is not None:
+                inv.settled_paise = max(0, (inv.settled_paise or 0) - a.amount_paise)
+                if inv.settled_paise <= 0:
+                    inv.first_payment_date = None
+                    inv.settled_date = None
+                    inv.status = InvoiceStatus.OPEN
+                else:
+                    inv.settled_date = None
+                    inv.status = InvoiceStatus.PART_PAID
+                reopened.add(inv.invoice_no)
+            db.delete(a)
+        db.delete(t)
+    removed_inv = 0
+    for inv_id in (batch.report_json or {}).get("invoice_ids", []):
+        inv = db.get(Invoice, inv_id)
+        if inv is not None and inv.business_id == batch.business_id:
+            for a in db.scalars(select(Allocation).where(Allocation.invoice_id == inv.id)).all():
+                t = db.get(Transaction, a.transaction_id)
+                if t is not None:
+                    t.allocated_paise = max(0, (t.allocated_paise or 0) - a.amount_paise)
+                    if t.allocated_paise <= 0:
+                        t.recon_status = ReconStatus.UNRECONCILED
+                db.delete(a)
+            db.delete(inv)
+            removed_inv += 1
+    batch.status = "reverted"
+    batch.report_json = {**(batch.report_json or {}),
+                         "reverted": {"transactions_removed": len(txns),
+                                      "invoices_removed": removed_inv,
+                                      "invoices_reopened": sorted(reopened)}}
+    return batch.report_json["reverted"]
