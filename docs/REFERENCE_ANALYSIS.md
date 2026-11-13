@@ -1,5 +1,11 @@
 # Reference analysis
 
+> **Historical document.** This records the v1 dark-lime design system; the v2
+> Atelier direction is also now historical. The current system is
+> **RUNWAY / Grove v3** (the user's Google Drive reference), specified in
+> `DESIGN.md` and analysed in `docs/DRIVE_REFERENCE.md`. Earlier research is in
+> `docs/DESIGN_RESEARCH.md`. The reference files themselves remain unmodified.
+
 How the supplied design material became RUNWAY's design system.
 
 **The reference files are unmodified.** `Reference/` contains exactly what was

@@ -12,8 +12,8 @@
 
    It is also the only honest way to demonstrate the three-state rule
    without asking a visitor to log in first: the scenario switch below
-   genuinely redraws ACTUAL (cyan, solid, one point — the as-of week),
-   PREDICTED (lime band) and SIMULATED (amber, dashed) in one frame.
+   genuinely redraws ACTUAL (blue, solid, one point — the as-of week),
+   PREDICTED (forest band) and SIMULATED (amber, dashed) in one frame.
 
    Figures: the synthetic wholesale distributor shipped with the demo seed,
    rounded to the paise the ledger actually stores. Nothing here is invented
@@ -28,7 +28,7 @@ import {
 import { motion } from "motion/react";
 import { CashBandChart, BreachBars, HealthGauge, type CashSeries } from "./charts";
 import { Delta, Evidence, Panel, Provenance, Stat, StateBadge } from "./primitives";
-import { Rise } from "./bits";
+import { Reveal } from "./motion";
 import { EASE_OUT } from "./motion";
 import { inr, weeks as fmtWeeks, pct } from "@/lib/format";
 
@@ -107,20 +107,18 @@ const SCENARIOS: Scenario[] = [
 
 /* ── the section ─────────────────────────────────────────────── */
 
-export default function ProductPreview() {
+export function ProductPreview() {
   const [i, setI] = useState(0);
   const s = SCENARIOS[i];
   const base = SCENARIOS[0];
   const simulated = s.overlay !== null;
 
   return (
-    <section id="product" className="relative mx-auto max-w-7xl px-5 py-28 sm:px-8 sm:py-36">
-      <Rise>
+    <section id="product" className="relative mx-auto max-w-7xl px-5 py-24 sm:px-8 sm:py-32">
+      <Reveal y={18}>
         <div className="mx-auto max-w-3xl text-center">
-          <p className="font-mono text-[11px] uppercase tracking-[0.2em] text-primary">
-            The product
-          </p>
-          <h2 className="mt-4 font-display text-[clamp(1.8rem,4vw,2.9rem)] font-semibold leading-[1.1] tracking-[-0.025em] text-balance">
+          <p className="atelier-eyebrow text-primary">04 / The product</p>
+          <h2 className="mt-4 font-editorial text-[clamp(2.3rem,4.8vw,4rem)] leading-[1.05] text-balance">
             This is the real screen, not a picture of one.
           </h2>
           <p className="mx-auto mt-5 max-w-xl text-pretty text-[15px] leading-relaxed text-muted-foreground">
@@ -128,11 +126,11 @@ export default function ProductPreview() {
             the baseline, so the gap between the two is the decision and not noise.
           </p>
         </div>
-      </Rise>
+      </Reveal>
 
       {/* the product frame — 16px, DESIGN.md's xl radius */}
-      <Rise delay={0.1}>
-        <div className="mt-14 overflow-hidden rounded-2xl border border-border bg-card shadow-[var(--shadow-float)]">
+      <Reveal delay={0.1} y={18}>
+        <div className="atelier-frame mt-12">
           {/* window chrome */}
           <div className="flex items-center gap-3 border-b border-border bg-surface px-4 py-2.5">
             <div className="flex items-center gap-1.5" aria-hidden>
@@ -152,8 +150,8 @@ export default function ProductPreview() {
           </div>
 
           {/* the lever rail */}
-          <div className="flex flex-wrap items-center gap-2 border-b border-border px-4 py-3">
-            <span className="mr-1 flex items-center gap-1.5 text-[11px] font-medium uppercase tracking-wider text-muted-foreground">
+          <div className="flex flex-wrap items-center gap-2 border-b border-line bg-card px-4 py-3">
+            <span className="mr-1 flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-wider text-ink-3">
               <GitBranch className="size-3.5" aria-hidden /> Lever
             </span>
             {SCENARIOS.map((sc, n) => (
@@ -161,10 +159,10 @@ export default function ProductPreview() {
                 key={sc.id}
                 onClick={() => setI(n)}
                 aria-pressed={n === i}
-                className={`relative rounded-md border px-3 py-1.5 text-xs font-medium transition-colors ${
+                className={`rounded-full px-3.5 py-1.5 text-[12px] font-semibold transition-colors ${
                   n === i
-                    ? "border-primary/40 bg-primary/10 text-primary"
-                    : "border-border text-muted-foreground hover:border-border-strong hover:text-foreground"
+                    ? "bg-forest text-white"
+                    : "bg-paper-2 text-ink-2 hover:text-ink"
                 }`}
               >
                 {sc.label}
@@ -299,9 +297,9 @@ export default function ProductPreview() {
             </Provenance>
           </div>
         </div>
-      </Rise>
+      </Reveal>
 
-      <Rise delay={0.15}>
+      <Reveal delay={0.15} y={18}>
         <div className="mt-8 flex flex-wrap items-center justify-center gap-x-6 gap-y-3 text-center">
           <p className="text-sm text-muted-foreground">
             Twenty-one screens behind the login do this against your own ledger.
@@ -314,7 +312,9 @@ export default function ProductPreview() {
             <ArrowRight className="size-4 transition-transform group-hover:translate-x-0.5" />
           </Link>
         </div>
-      </Rise>
+      </Reveal>
     </section>
   );
 }
+
+export default ProductPreview;

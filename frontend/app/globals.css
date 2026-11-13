@@ -1,182 +1,295 @@
 @import 'tailwindcss';
 @import 'tw-animate-css';
 
-/*
- * RUNWAY design system
- * --------------------
- * Derived from Reference/"RUNWAY Financial Copilot UI Board.png": a deep
- * navy-indigo obsidian base (#070916 page, #0F1322 cards) with a single
- * violet accent and a strict semantic set for financial direction.
- *
- * Rules this system enforces:
- *   - Violet is for interaction and the product's own voice. It is never
- *     used to mean "good".
- *   - Gain/loss/warn are the only colours that carry financial meaning, and
- *     they are always paired with a glyph or a sign so colour is never the
- *     sole channel (WCAG 1.4.1).
- *   - Each of the three states has its own hue AND its own line treatment:
- *     actual is solid, predicted is a band, simulated is dashed.
- */
-
-/*
- * RUNWAY design system — implements /DESIGN.md (Linear structure, lime accent).
- *
- * Hierarchy is the four-step surface ladder plus 1px hairlines, not shadow.
- * The accent is used on brand, CTA and focus only, and never means "good".
- * Semantic colours carry financial meaning only and always ship with a glyph.
- */
-
-/*
- * RUNWAY design system — implements /DESIGN.md (Linear structure, lime accent).
- *
- * Hierarchy is the four-step surface ladder plus 1px hairlines, not shadow.
- * The accent is brand, CTA and focus only, and never means "good".
- * Semantic colours carry financial meaning only and always ship with a glyph
- * or a sign, so colour is never the sole channel (WCAG 1.4.1).
- */
-
-@custom-variant dark (&:is(.dark *));
-
-:root {
-  /* Native UI (scrollbars, the date picker, select popups) follows the
-     theme only if the browser is told which one is in play. */
-  color-scheme: dark;
-
-  /* canvas + four-step ladder */
-  --background: #06100B;
-  --foreground: #F4F8F5;
-
-  --card: #0F1613;
-  --card-foreground: #F4F8F5;
-  --popover: #19241F;
-  --popover-foreground: #F4F8F5;
-
-  /* brand / interaction only */
-  --primary: #C6F54A;
-  --primary-foreground: #0D1A10;
-  --primary-soft: rgba(198, 245, 74, 0.13);
-  --primary-ring: rgba(198, 245, 74, 0.42);
-
-  --secondary: #141D19;
-  --secondary-foreground: #CBD6CE;
-  --muted: #141D19;
-  --muted-foreground: #8A978E;
-  --accent: #19241F;
-  --accent-foreground: #F4F8F5;
-
-  --destructive: #FF6B7A;
-  --destructive-foreground: #0D1A10;
-
-  --border: #1E2A24;
-  --border-strong: #2B3A32;
-  --input: #19241F;
-  --ring: #C6F54A;
-
-  /* semantic — financial meaning only, never decoration */
-  --fin-gain: #34E7B0;
-  --fin-gain-soft: rgba(52, 231, 176, 0.14);
-  --fin-loss: #FF6B7A;
-  --fin-loss-soft: rgba(255, 107, 122, 0.14);
-  --fin-warn: #F5C45E;
-  --fin-warn-soft: rgba(245, 196, 94, 0.14);
-  --fin-info: #6FC8F5;
-  --fin-info-soft: rgba(111, 200, 245, 0.14);
-  --fin-neutral: #8A978E;
-
-  /* the three states — a hue AND a line treatment each */
-  --state-actual: #6FC8F5;
-  --state-predicted: #C6F54A;
-  --state-simulated: #F5C45E;
-  --state-actual-soft: rgba(111, 200, 245, 0.16);
-  --state-predicted-soft: rgba(198, 245, 74, 0.16);
-  --state-simulated-soft: rgba(245, 196, 94, 0.16);
-
-  --chart-1: #C6F54A;
-  --chart-2: #34E7B0;
-  --chart-3: #6FC8F5;
-  --chart-4: #F5C45E;
-  --chart-5: #FF6B7A;
-  --chart-6: #64706A;
-  --chart-grid: #1E2A24;
-  --chart-tick: #8A978E;
-
-  --surface: #141D19;
-  --surface-hover: #19241F;
-  --sidebar: #0B1410;
-  --sidebar-foreground: #E6EEE9;
-  --sidebar-primary: #C6F54A;
-  --sidebar-primary-foreground: #0D1A10;
-  --sidebar-accent: #19241F;
-  --sidebar-accent-foreground: #F4F8F5;
-  --sidebar-border: #1E2A24;
-  --sidebar-ring: #C6F54A;
-
-  /* Linear's scale: 8px buttons, 12px cards, 16px product panels. */
-  --radius: 0.75rem;
-
-  /* Depth is the ladder and the hairline. The one concession is a faint
-     top-edge highlight on a lifted panel. */
-  --shadow-card: 0 1px 0 0 rgba(255, 255, 255, 0.035) inset;
-  --shadow-float: 0 1px 0 0 rgba(255, 255, 255, 0.05) inset,
-                  0 18px 48px -32px rgba(0, 0, 0, 0.9);
-  --glow-primary: 0 0 0 1px rgba(198, 245, 74, 0.28);
+/* Self-hosted from the same fontsource families the Drive reference uses.
+   No build-time or browser-side request to a third-party font host. */
+@font-face {
+  font-family: 'Plus Jakarta Sans';
+  src: url('/fonts/plus-jakarta-sans-latin.woff2') format('woff2');
+  font-style: normal;
+  font-weight: 200 800;
+  font-display: swap;
+}
+@font-face {
+  font-family: 'Instrument Serif';
+  src: url('/fonts/instrument-serif-latin-400.woff2') format('woff2');
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+}
+@font-face {
+  font-family: 'Instrument Serif';
+  src: url('/fonts/instrument-serif-latin-400-italic.woff2') format('woff2');
+  font-style: italic;
+  font-weight: 400;
+  font-display: swap;
+}
+@font-face {
+  font-family: 'JetBrains Mono';
+  src: url('/fonts/jetbrains-mono-latin.woff2') format('woff2');
+  font-style: normal;
+  font-weight: 100 800;
+  font-display: swap;
 }
 
-/* Light mode is a first-class theme, not an afterthought: accountants work
-   in daylight on projectors where the dark theme washes out. */
-:root[data-theme='light'] {
+/*
+ * RUNWAY — Grove design system (v3)
+ * ---------------------------------
+ * The user's Google Drive reference (`redesign-fintech-app-ui`) is now the
+ * visual source of truth for the whole product: warm paper, deep ink, forest
+ * green, one lime accent, Plus Jakarta Sans with Instrument Serif italics,
+ * pill buttons, 20px white cards and quiet hairline tables.
+ *
+ * v2's ivory paper and deep ink survive. The electric chartreuse becomes the
+ * reference lime, and forest replaces the olive primary. The three-state,
+ * provenance and accessibility contracts are unchanged: a state is never
+ * carried by hue alone, a coloured delta always has a glyph and a word, and
+ * every computed screen keeps its source-of-truth note.
+ *
+ * See /DESIGN.md and /docs/DRIVE_REFERENCE.md.
+ */
+
+@custom-variant dark (&:is([data-theme='dark'] *));
+
+/* ── Reference palette · light is the product's default ──────────────────── */
+:root {
   color-scheme: light;
-  --background: #FBFCFB;
-  --foreground: #16211B;
-  --card: #FFFFFF;
-  --card-foreground: #16211B;
-  --popover: #FFFFFF;
-  --popover-foreground: #16211B;
-  --primary: #4E7F18;
-  --primary-foreground: #FFFFFF;
-  --primary-soft: rgba(78, 127, 24, 0.10);
-  --secondary: #F2F5F3;
-  --secondary-foreground: #2A3831;
-  --muted: #EEF2EF;
-  --muted-foreground: #5C6B63;
-  --accent: #E9F0EB;
-  --accent-foreground: #1B2821;
-  --border: #DEE6E1;
-  --border-strong: #C6D2CB;
-  --input: #E6ECE8;
-  --surface: #F6F9F7;
-  --surface-hover: #EDF2EF;
-  --sidebar: #F6F9F7;
-  --sidebar-foreground: #233029;
-  --sidebar-accent: #E4EDE7;
-  --sidebar-border: #DEE6E1;
-  --fin-gain: #0E8F68;
-  --fin-loss: #C4374A;
-  --fin-warn: #9A6B06;
-  --fin-info: #1C6E9B;
-  --state-actual: #1C6E9B;
-  --state-predicted: #4E7F18;
-  --state-simulated: #9A6B06;
-  --chart-grid: #DEE6E1;
-  --chart-tick: #5C6B63;
-  --shadow-card: 0 1px 2px -1px rgba(0, 0, 0, 0.06);
-  --shadow-float: 0 14px 40px -24px rgba(0, 0, 0, 0.18);
+
+  --paper: #f6f4ee;
+  --paper-2: #efece3;
+  --card: #ffffff;
+  --ink: #10201a;
+  --ink-2: #46544d;
+  --ink-3: #7b8780;
+  --line: #e6e2d7;
+  --line-2: #d6d1c3;
+  --forest: #0c3b2a;
+  --forest-2: #14563d;
+  --forest-3: #1d6f50;
+  --lime: #d3f26b;
+  --lime-2: #bfe24a;
+  --sage: #e7eee1;
+  --gain: #0f8a5f;
+  --loss: #c93b2b;
+  --warn: #b7791f;
+  --sky: #2f6da8;
+
+  /* legacy token ladder — every existing screen reads these */
+  --background: var(--paper);
+  --foreground: var(--ink);
+  --card-foreground: var(--ink);
+  --popover: #ffffff;
+  --popover-foreground: var(--ink);
+
+  --primary: var(--forest);
+  --primary-foreground: #ffffff;
+  --primary-soft: var(--sage);
+  --primary-ring: rgba(12, 59, 42, 0.30);
+  --primary-bright: var(--lime);
+  --primary-bright-foreground: var(--forest);
+
+  --secondary: var(--paper-2);
+  --secondary-foreground: var(--ink-2);
+  --muted: var(--paper-2);
+  --muted-foreground: var(--ink-2);
+  --accent: var(--sage);
+  --accent-foreground: var(--forest);
+  --destructive: var(--loss);
+  --destructive-foreground: #ffffff;
+
+  --border: var(--line);
+  --border-strong: var(--line-2);
+  --input: #ffffff;
+  --ring: var(--forest-3);
+
+  /* semantic — financial meaning only, never decoration */
+  --fin-gain: var(--gain);
+  --fin-gain-soft: #dff3e8;
+  --fin-loss: var(--loss);
+  --fin-loss-soft: #fbe3df;
+  --fin-warn: var(--warn);
+  --fin-warn-soft: #faefd5;
+  --fin-info: var(--sky);
+  --fin-info-soft: #e0ecf7;
+  --fin-neutral: var(--ink-3);
+
+  /* the three states: a hue AND a line treatment */
+  --state-actual: var(--sky);
+  --state-actual-soft: #e0ecf7;
+  --state-predicted: var(--forest-2);
+  --state-predicted-soft: #e2eee6;
+  --state-simulated: var(--warn);
+  --state-simulated-soft: #faefd5;
+
+  --chart-1: var(--forest);
+  --chart-2: var(--forest-3);
+  --chart-3: var(--lime-2);
+  --chart-4: #d98e0b;
+  --chart-5: var(--loss);
+  --chart-6: var(--ink-3);
+  --chart-grid: #ece8dc;
+  --chart-tick: var(--ink-3);
+
+  --surface: var(--paper-2);
+  --surface-hover: #e8e4d9;
+
+  /* the forest inverse scope: story panels, login panel, dark CTA blocks */
+  --sidebar: var(--forest);
+  --sidebar-foreground: #ffffff;
+  --sidebar-muted: rgba(255, 255, 255, 0.72);
+  --sidebar-primary: var(--lime);
+  --sidebar-primary-foreground: var(--forest);
+  --sidebar-accent: var(--forest-2);
+  --sidebar-accent-foreground: #ffffff;
+  --sidebar-border: var(--forest-2);
+  --sidebar-ring: var(--lime);
+
+  --radius: 0.75rem;
+  --shadow-card: 0 1px 2px rgba(12, 59, 42, 0.045);
+  --shadow-float: 0 40px 90px -30px rgba(12, 59, 42, 0.35);
+  --glow-primary: 0 0 0 1px rgba(211, 242, 107, 0.55);
+  --aurora-1: rgba(211, 242, 107, 0.20);
+  --aurora-2: rgba(29, 111, 80, 0.10);
+  --aurora-3: rgba(12, 59, 42, 0.08);
+  --noise-opacity: 0.012;
+  --shimmer-highlight: rgba(255, 255, 255, 0.72);
+}
+
+/* ── Dark is a companion, not the identity ───────────────────────────────── */
+:root[data-theme='dark'] {
+  color-scheme: dark;
+
+  --paper: #0b1712;
+  --paper-2: #10201a;
+  --card: #13241c;
+  --ink: #f2f5ef;
+  --ink-2: #b8c7bd;
+  --ink-3: #8b9b90;
+  --line: #22362c;
+  --line-2: #2f463a;
+  --forest: #0c3b2a;
+  --forest-2: #1d6f50;
+  --forest-3: #7fd8ab;
+  --lime: #d3f26b;
+  --lime-2: #bfe24a;
+  --sage: #1c3226;
+  --gain: #45d7a5;
+  --loss: #ff8a7a;
+  --warn: #e8bc60;
+  --sky: #74c7ee;
+
+  --background: var(--paper);
+  --foreground: var(--ink);
+  --card-foreground: var(--ink);
+  --popover: #16281e;
+  --popover-foreground: var(--ink);
+
+  --primary: var(--lime);
+  --primary-foreground: #0b1712;
+  --primary-soft: rgba(211, 242, 107, 0.14);
+  --primary-ring: rgba(211, 242, 107, 0.42);
+  --primary-bright: var(--lime);
+  --primary-bright-foreground: #0b1712;
+
+  --secondary: var(--paper-2);
+  --secondary-foreground: var(--ink-2);
+  --muted: var(--paper-2);
+  --muted-foreground: var(--ink-2);
+  --accent: var(--sage);
+  --accent-foreground: var(--lime);
+  --destructive: var(--loss);
+  --destructive-foreground: #0b1712;
+
+  --border: var(--line);
+  --border-strong: var(--line-2);
+  --input: var(--paper-2);
+  --ring: var(--lime);
+
+  --fin-gain: var(--gain);
+  --fin-gain-soft: rgba(69, 215, 165, 0.13);
+  --fin-loss: var(--loss);
+  --fin-loss-soft: rgba(255, 138, 122, 0.13);
+  --fin-warn: var(--warn);
+  --fin-warn-soft: rgba(232, 188, 96, 0.13);
+  --fin-info: var(--sky);
+  --fin-info-soft: rgba(116, 199, 238, 0.13);
+  --fin-neutral: var(--ink-3);
+
+  --state-actual: var(--sky);
+  --state-actual-soft: rgba(116, 199, 238, 0.13);
+  --state-predicted: var(--lime);
+  --state-predicted-soft: rgba(211, 242, 107, 0.13);
+  --state-simulated: var(--warn);
+  --state-simulated-soft: rgba(232, 188, 96, 0.13);
+
+  --chart-1: var(--lime);
+  --chart-2: var(--gain);
+  --chart-3: var(--sky);
+  --chart-4: var(--warn);
+  --chart-5: var(--loss);
+  --chart-6: var(--ink-3);
+  --chart-grid: #22362c;
+  --chart-tick: var(--ink-3);
+
+  --surface: var(--paper-2);
+  --surface-hover: #1a2e23;
+
+  --sidebar: #08140e;
+  --sidebar-foreground: #f2f5ef;
+  --sidebar-muted: rgba(242, 245, 239, 0.70);
+  --sidebar-primary: var(--lime);
+  --sidebar-primary-foreground: #08140e;
+  --sidebar-accent: #10261a;
+  --sidebar-accent-foreground: #ffffff;
+  --sidebar-border: #1b3627;
+  --sidebar-ring: var(--lime);
+
+  --shadow-card: 0 1px 0 rgba(255, 255, 255, 0.035) inset;
+  --shadow-float: 0 18px 48px -32px rgba(0, 0, 0, 0.9);
+  --glow-primary: 0 0 0 1px rgba(211, 242, 107, 0.28);
+  --aurora-1: rgba(211, 242, 107, 0.13);
+  --aurora-2: rgba(116, 199, 238, 0.10);
+  --aurora-3: rgba(69, 215, 165, 0.08);
+  --noise-opacity: 0.022;
+  --shimmer-highlight: rgba(255, 255, 255, 0.06);
 }
 
 @theme inline {
-  --font-sans: var(--font-geist-sans), 'Inter', system-ui, sans-serif;
-  --font-display: var(--font-display), 'Inter', system-ui, sans-serif;
+  --font-sans: var(--font-geist-sans), 'Plus Jakarta Sans', ui-sans-serif, system-ui, sans-serif;
+  --font-display: var(--font-display), 'Plus Jakarta Sans', ui-sans-serif, system-ui, sans-serif;
   --font-mono: var(--font-geist-mono), 'JetBrains Mono', ui-monospace, monospace;
 
+  /* reference names, so components can speak the Drive UI directly */
+  --color-paper: var(--paper);
+  --color-paper-2: var(--paper-2);
+  --color-card: var(--card);
+  --color-ink: var(--ink);
+  --color-ink-2: var(--ink-2);
+  --color-ink-3: var(--ink-3);
+  --color-line: var(--line);
+  --color-line-2: var(--line-2);
+  --color-forest: var(--forest);
+  --color-forest-2: var(--forest-2);
+  --color-forest-3: var(--forest-3);
+  --color-lime: var(--lime);
+  --color-lime-2: var(--lime-2);
+  --color-sage: var(--sage);
+  --color-gain: var(--gain);
+  --color-loss: var(--loss);
+  --color-warn: var(--warn);
+  --color-sky: var(--sky);
+
+  /* legacy token utilities used by all 21 screens */
   --color-background: var(--background);
   --color-foreground: var(--foreground);
-  --color-card: var(--card);
   --color-card-foreground: var(--card-foreground);
   --color-popover: var(--popover);
   --color-popover-foreground: var(--popover-foreground);
   --color-primary: var(--primary);
   --color-primary-foreground: var(--primary-foreground);
   --color-primary-soft: var(--primary-soft);
+  --color-primary-bright: var(--primary-bright);
+  --color-primary-bright-foreground: var(--primary-bright-foreground);
   --color-secondary: var(--secondary);
   --color-secondary-foreground: var(--secondary-foreground);
   --color-muted: var(--muted);
@@ -218,6 +331,7 @@
 
   --color-sidebar: var(--sidebar);
   --color-sidebar-foreground: var(--sidebar-foreground);
+  --color-sidebar-muted: var(--sidebar-muted);
   --color-sidebar-primary: var(--sidebar-primary);
   --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
   --color-sidebar-accent: var(--sidebar-accent);
@@ -225,271 +339,373 @@
   --color-sidebar-border: var(--sidebar-border);
   --color-sidebar-ring: var(--sidebar-ring);
 
-  /* DESIGN.md shape scale */
-  --radius-xs: 4px;    /* chips, status badges */
-  --radius-sm: 6px;    /* inline tags */
-  --radius-md: 8px;    /* buttons, inputs */
-  --radius-lg: 12px;   /* cards */
-  --radius-xl: 16px;   /* product panels */
-  --radius-2xl: 24px;  /* oversized CTA banners, rare */
+  --radius-xs: 4px;
+  --radius-sm: 8px;
+  --radius-md: 10px;
+  --radius-lg: 12px;
+  --radius-xl: 16px;
+  --radius-2xl: 20px;
 }
 
+/* ── base ────────────────────────────────────────────────────────────────── */
 @layer base {
   * { @apply border-border; }
-  html { -webkit-text-size-adjust: 100%; scroll-behavior: auto; }
+  html { -webkit-text-size-adjust: 100%; scroll-behavior: smooth; }
   body {
     @apply bg-background text-foreground font-sans antialiased;
     font-feature-settings: 'cv11', 'ss01';
     text-rendering: optimizeLegibility;
   }
-  /* Tabular numerals everywhere a number can change: otherwise every
-     refresh makes the layout twitch, which reads as instability in a
-     product whose entire job is to look trustworthy. */
-  .tnum, td, th, .font-mono { font-variant-numeric: tabular-nums; }
-  :focus-visible {
-    outline: 2px solid var(--ring);
-    outline-offset: 2px;
-    border-radius: 4px;
-  }
-  ::selection { background: var(--primary-soft); color: var(--foreground); }
-  ::-webkit-scrollbar { width: 10px; height: 10px; }
-  ::-webkit-scrollbar-track { background: transparent; }
-  ::-webkit-scrollbar-thumb {
-    background: var(--border-strong); border-radius: 8px;
-    border: 3px solid transparent; background-clip: content-box;
-  }
-  ::-webkit-scrollbar-thumb:hover { background: var(--muted-foreground); background-clip: content-box; }
+  .tnum, .num, td, th, .font-mono { font-variant-numeric: tabular-nums; }
+  :focus-visible { outline: 2px solid var(--ring); outline-offset: 2px; border-radius: 4px; }
+  ::selection { background: var(--lime); color: var(--forest); }
 }
 
+/* ── the Drive reference's component vocabulary ─────────────────────────── */
 @layer components {
+  .card {
+    background: var(--card);
+    border: 1px solid var(--line);
+    border-radius: 20px;
+  }
+  .card-flat {
+    background: var(--card);
+    border: 1px solid var(--line);
+    border-radius: 14px;
+  }
+  .eyebrow {
+    font-size: 12px;
+    font-weight: 600;
+    letter-spacing: 0.04em;
+    color: var(--forest-3);
+  }
+  .btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    height: 44px;
+    padding: 0 20px;
+    border-radius: 999px;
+    font-size: 14px;
+    font-weight: 600;
+    white-space: nowrap;
+    cursor: pointer;
+    transition: transform 0.15s ease, background 0.15s ease, box-shadow 0.15s ease;
+  }
+  .btn:active { transform: scale(0.98); }
+  .btn-primary { background: var(--forest); color: #fff; }
+  .btn-primary:hover { background: var(--forest-2); }
+  .btn-lime { background: var(--lime); color: var(--forest); }
+  .btn-lime:hover { background: var(--lime-2); }
+  .btn-ghost { background: transparent; color: var(--ink); border: 1px solid var(--line-2); }
+  .btn-ghost:hover { background: var(--card); }
+  .btn-sm { height: 36px; padding: 0 14px; font-size: 13px; }
+  .btn:disabled { opacity: 0.6; cursor: not-allowed; transform: none; }
+
+  .pill {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 3px 10px;
+    border-radius: 999px;
+    font-size: 12px;
+    font-weight: 600;
+    line-height: 1.5;
+    background: var(--paper-2);
+    color: var(--ink-2);
+  }
+  .pill-gain { background: #dff3e8; color: #0b6b49; }
+  .pill-loss { background: #fbe3df; color: #a02c1f; }
+  .pill-warn { background: #faefd5; color: #8a5a0f; }
+  .pill-sky { background: #e0ecf7; color: #234f7c; }
+
+  .tbl { width: 100%; border-collapse: collapse; font-size: 14px; }
+  .tbl th {
+    text-align: left; font-size: 12px; font-weight: 600; color: var(--ink-3);
+    padding: 10px 16px; border-bottom: 1px solid var(--line); white-space: nowrap;
+  }
+  .tbl td { padding: 14px 16px; border-bottom: 1px solid var(--line); vertical-align: middle; }
+  .tbl tr:last-child td { border-bottom: 0; }
+  .tbl tbody tr:hover td { background: #fbfaf6; }
+  .tbl .r { text-align: right; }
+
+  .field {
+    width: 100%; height: 46px; padding: 0 14px; border-radius: 12px;
+    border: 1px solid var(--line-2); background: var(--card);
+    font-size: 15px; color: var(--ink);
+  }
+  textarea.field { height: auto; padding: 12px 14px; }
+  .field:focus-visible { outline: 2px solid var(--forest-3); outline-offset: 2px; }
+  .label { display: block; font-size: 13px; font-weight: 600; margin-bottom: 6px; color: var(--ink); }
+
+  input[type="range"] {
+    -webkit-appearance: none; appearance: none; width: 100%; height: 6px;
+    border-radius: 999px; background: var(--line); outline-offset: 6px;
+  }
+  input[type="range"]::-webkit-slider-thumb {
+    -webkit-appearance: none; width: 22px; height: 22px; border-radius: 50%;
+    background: var(--forest); border: 4px solid var(--lime); cursor: pointer;
+  }
+  input[type="range"]::-moz-range-thumb {
+    width: 16px; height: 16px; border-radius: 50%;
+    background: var(--forest); border: 4px solid var(--lime); cursor: pointer;
+  }
+
   .rw-card {
-    @apply rounded-lg border border-border bg-card;
+    @apply relative border border-line bg-card;
+    border-radius: 18px;
     box-shadow: var(--shadow-card);
   }
-  .rw-surface { @apply rounded-lg border border-border bg-surface; }
+  .rw-surface { @apply rounded-lg border border-line bg-paper-2; }
   .rw-grid-bg {
     background-image:
-      linear-gradient(to right, var(--border) 1px, transparent 1px),
-      linear-gradient(to bottom, var(--border) 1px, transparent 1px);
+      linear-gradient(to right, var(--line) 1px, transparent 1px),
+      linear-gradient(to bottom, var(--line) 1px, transparent 1px);
     background-size: 56px 56px;
     mask-image: radial-gradient(ellipse 80% 60% at 50% 0%, #000 40%, transparent 100%);
-    opacity: 0.35;
+    opacity: 0.42;
   }
   .rw-aurora {
     background:
-      radial-gradient(62rem 38rem at 10% -10%, rgba(198, 245, 74, 0.11), transparent 62%),
-      radial-gradient(54rem 34rem at 92% 2%, rgba(52, 231, 176, 0.10), transparent 60%),
-      radial-gradient(46rem 30rem at 50% 110%, rgba(111, 200, 245, 0.07), transparent 60%);
+      radial-gradient(62rem 38rem at 8% -12%, var(--aurora-1), transparent 62%),
+      radial-gradient(54rem 34rem at 94% 4%, var(--aurora-2), transparent 60%),
+      radial-gradient(46rem 30rem at 50% 110%, var(--aurora-3), transparent 60%);
   }
-  .rw-hairline { @apply border-t border-border; }
+  .rw-hairline { @apply border-t border-line; }
   .rw-chip {
     @apply inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1
-           text-[11px] font-medium leading-none;
+           text-[11px] font-semibold leading-none;
+    background: var(--paper-2);
+    color: var(--ink-2);
+    border-color: var(--line);
   }
   .rw-kbd {
     @apply inline-flex h-5 min-w-5 items-center justify-center rounded border
-           border-border bg-surface px-1.5 font-mono text-[10px] text-muted-foreground;
+           border-line bg-paper-2 px-1.5 font-mono text-[10px] text-ink-3;
   }
 }
 
+/* ── marketing helpers + Atelier compatibility ──────────────────────────── */
 @layer utilities {
   .text-balance { text-wrap: balance; }
   .text-pretty { text-wrap: pretty; }
+
+  .display {
+    font-weight: 600;
+    letter-spacing: -0.035em;
+    line-height: 1.04;
+    text-wrap: balance;
+  }
+  .display em, .serif-i, .font-editorial em, .font-editorial .italic {
+    font-family: var(--font-editorial), 'Instrument Serif', Georgia, serif;
+    font-style: italic;
+    font-weight: 400;
+    letter-spacing: -0.01em;
+  }
+  /* v2's big serif headings become the reference's tight sans display.
+     Serif survives only for an emphasised word, exactly as the Drive UI does. */
+  .font-editorial {
+    font-family: var(--font-geist-sans), 'Plus Jakarta Sans', ui-sans-serif, system-ui, sans-serif;
+    font-weight: 600;
+    letter-spacing: -0.035em;
+    line-height: 1.04;
+    text-wrap: balance;
+  }
+
+  .dots {
+    background-image: radial-gradient(rgba(255, 255, 255, 0.12) 1px, transparent 1px);
+    background-size: 22px 22px;
+  }
+  .grain {
+    background-image: radial-gradient(rgba(12, 59, 42, 0.07) 1px, transparent 1px);
+    background-size: 18px 18px;
+  }
+  .no-print { }
+
+  .rw-sidebar {
+    --foreground: var(--sidebar-foreground);
+    --muted-foreground: var(--sidebar-muted);
+    --border: var(--sidebar-border);
+    --border-strong: var(--sidebar-border);
+    --surface: var(--sidebar-accent);
+    --surface-hover: var(--sidebar-accent);
+    --card: var(--sidebar-accent);
+    --card-foreground: var(--sidebar-foreground);
+    --primary: var(--sidebar-primary);
+    --primary-foreground: var(--sidebar-primary-foreground);
+    --primary-soft: rgba(211, 242, 107, 0.16);
+    --primary-bright: var(--sidebar-primary);
+    --primary-bright-foreground: var(--sidebar-primary-foreground);
+    --ring: var(--sidebar-ring);
+    --popover: var(--sidebar-accent);
+    --popover-foreground: var(--sidebar-foreground);
+    --background: var(--sidebar);
+  }
+
+  .atelier-eyebrow {
+    font-size: 11px;
+    line-height: 1.2;
+    font-weight: 700;
+    letter-spacing: 0.09em;
+    text-transform: uppercase;
+    color: var(--forest-3);
+  }
+  .atelier-eyebrow-sm { font-size: 9px; }
+  .atelier-eyebrow-muted { color: var(--sidebar-muted); }
+  .atelier-rule { height: 1px; border: 0; background: var(--line); }
+  .atelier-frame {
+    border: 1px solid var(--line-2);
+    border-radius: 20px;
+    background: var(--card);
+    box-shadow: var(--shadow-float);
+    overflow: hidden;
+  }
+  .atelier-card {
+    background: var(--card);
+    border: 1px solid var(--line);
+    border-radius: 20px;
+    transition: border-color .25s ease, transform .25s ease, box-shadow .25s ease;
+  }
+  .atelier-card:hover {
+    border-color: var(--line-2);
+    transform: translateY(-2px);
+    box-shadow: var(--shadow-float);
+  }
+  .atelier-cta,
+  .atelier-cta-dark,
+  .atelier-cta-ghost,
+  .atelier-cta-ghost-inverse {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: .5rem;
+    border-radius: 999px;
+    font-size: 14px;
+    font-weight: 600;
+    padding: 0 20px;
+    min-height: 44px;
+    transition: transform .2s ease, filter .2s ease, background-color .2s ease, border-color .2s ease;
+  }
+  .atelier-cta { background: var(--lime); color: var(--forest); }
+  .atelier-cta:hover, .atelier-cta-dark:hover,
+  .atelier-cta-ghost:hover, .atelier-cta-ghost-inverse:hover { transform: translateY(-2px); }
+  .atelier-cta-dark { background: var(--forest); color: #fff; }
+  .atelier-cta-dark:hover { background: var(--forest-2); }
+  .atelier-cta-ghost { border: 1px solid var(--line-2); background: var(--card); color: var(--ink); }
+  .atelier-cta-ghost:hover { border-color: var(--forest-3); }
+  .atelier-cta-ghost-inverse { border: 1px solid var(--sidebar-border); background: transparent; color: var(--sidebar-foreground); }
+  .atelier-cta-ghost-inverse:hover { background: var(--sidebar-accent); }
+  .atelier-pill {
+    display: inline-flex; align-items: center; gap: .45rem;
+    border-radius: 999px; background: var(--paper-2);
+    padding: .35rem .8rem; font-size: 12px; font-weight: 600; color: var(--ink-2);
+  }
+  .atelier-paper-grid { background-image: radial-gradient(rgba(12,59,42,.06) 1px, transparent 1px); background-size: 18px 18px; }
+  .atelier-ink-panel { background: var(--sidebar); color: var(--sidebar-foreground); }
+  .atelier-underline { text-decoration-line: underline; text-decoration-color: var(--lime); text-decoration-thickness: 5px; text-underline-offset: 8px; }
+  .atelier-index { font-family: var(--font-geist-mono), 'JetBrains Mono', ui-monospace, monospace; font-size: 11px; color: var(--ink-3); letter-spacing: .08em; }
+
   .rw-shimmer {
-    background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.055), transparent);
+    background: linear-gradient(90deg, transparent, var(--shimmer-highlight), transparent);
     background-size: 220% 100%;
     animation: rw-shimmer 1.6s ease-in-out infinite;
   }
-  @keyframes rw-shimmer {
-    0% { background-position: 180% 0; }
-    100% { background-position: -80% 0; }
-  }
+  @keyframes rw-shimmer { 0% { background-position: 180% 0; } 100% { background-position: -80% 0; } }
   .rw-rise { animation: rw-rise 0.5s cubic-bezier(0.16, 1, 0.3, 1) both; }
-  @keyframes rw-rise {
-    from { opacity: 0; transform: translateY(10px); }
-    to { opacity: 1; transform: none; }
-  }
+  @keyframes rw-rise { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: none; } }
   .rw-dash-sim { stroke-dasharray: 6 4; }
-}
 
-/* Respect the user's motion preference everywhere, including Lenis and GSAP
-   (both are disabled in JS when this matches). */
-@media (prefers-reduced-motion: reduce) {
-  *, *::before, *::after {
-    animation-duration: 0.001ms !important;
-    animation-iteration-count: 1 !important;
-    transition-duration: 0.001ms !important;
-    scroll-behavior: auto !important;
+  .rw-noise::after {
+    content: ""; position: absolute; inset: 0; pointer-events: none;
+    opacity: var(--noise-opacity); mix-blend-mode: multiply;
+    background-image: radial-gradient(rgba(12, 59, 42, 0.55) 1px, transparent 1px);
+    background-size: 18px 18px;
   }
-}
+  :root[data-theme='dark'] .rw-noise::after { mix-blend-mode: overlay; }
 
-/* ── marketing-surface keyframes ───────────────────────────────────
-   Scoped to the landing page; none of these run inside the app. */
-@keyframes rw-marquee {
-  from { transform: translateX(0); }
-  to   { transform: translateX(-100%); }
-}
-
-@keyframes rw-beam {
-  0%, 100% { opacity: 0; transform: translateY(-100%); }
-  50%      { opacity: 0.5; transform: translateY(100%); }
-}
-
-@keyframes rw-float {
-  0%, 100% { transform: translateY(0); }
-  50%      { transform: translateY(-10px); }
-}
-
-@keyframes rw-gradient-pan {
-  from { background-position: 0% 50%; }
-  to   { background-position: 100% 50%; }
-}
-
-@keyframes rw-pulse-ring {
-  0%   { box-shadow: 0 0 0 0 rgba(198, 245, 74, 0.35); }
-  70%  { box-shadow: 0 0 0 14px rgba(198, 245, 74, 0); }
-  100% { box-shadow: 0 0 0 0 rgba(198, 245, 74, 0); }
-}
-
-@layer utilities {
   .rw-float { animation: rw-float 6s ease-in-out infinite; }
-  .rw-ring  { animation: rw-pulse-ring 2.6s ease-out infinite; }
-  /* Only for plain text. background-clip cannot survive SplitText's
-     per-character spans — those take a solid accent colour instead. */
+  .rw-ring { animation: rw-pulse-ring 2.6s ease-out infinite; }
   .rw-text-gradient {
-    background-image: linear-gradient(100deg,
-      var(--primary) 0%, var(--fin-gain) 38%,
-      var(--state-actual) 66%, var(--primary) 100%);
+    background-image: linear-gradient(100deg, var(--forest) 0%, var(--forest-3) 42%, var(--gain) 72%, var(--forest) 100%);
     background-size: 200% 100%;
-    -webkit-background-clip: text;
-    background-clip: text;
-    color: transparent;
+    -webkit-background-clip: text; background-clip: text; color: transparent;
     -webkit-text-fill-color: transparent;
     animation: rw-gradient-pan 9s ease-in-out infinite alternate;
   }
-  .rw-noise::after {
-    content: ""; position: absolute; inset: 0; pointer-events: none;
-    opacity: 0.030; mix-blend-mode: overlay;
-    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='140' height='140'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='3'/%3E%3C/filter%3E%3Crect width='140' height='140' filter='url(%23n)'/%3E%3C/svg%3E");
-  }
+  .rise, .rise-2, .rise-3 { animation: rise .7s cubic-bezier(.2,.7,.2,1) both; }
+  .rise-2 { animation-delay: .12s; }
+  .rise-3 { animation-delay: .24s; }
+  .float { animation: rw-float 6s ease-in-out infinite; }
+  .marquee { animation: marquee 38s linear infinite; }
 }
 
-/* ═══════════════════════════════════════════════════════════════════
-   Premium layer — the chrome that makes the whole site feel built
-   rather than assembled. Everything here degrades to nothing under
-   prefers-reduced-motion, and none of it is load-bearing: strip the
-   block and every screen still reads correctly.
-   ═══════════════════════════════════════════════════════════════════ */
+@keyframes rise { from { opacity: 0; transform: translateY(14px); } to { opacity: 1; transform: none; } }
+@keyframes marquee { to { transform: translateX(-50%); } }
+@keyframes rw-float { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-8px); } }
+@keyframes rw-pulse-ring {
+  0% { box-shadow: 0 0 0 0 rgba(211, 242, 107, 0.42); }
+  70% { box-shadow: 0 0 0 14px rgba(211, 242, 107, 0); }
+  100% { box-shadow: 0 0 0 0 rgba(211, 242, 107, 0); }
+}
+@keyframes rw-gradient-pan { from { background-position: 0% 50%; } to { background-position: 100% 50%; } }
 
-/* ── 1. the screen cascade ──────────────────────────────────────────
-   Every application screen is a wrapper holding a header, some stat
-   grids and some panels. Fading the wrapper as one block is cheap and
-   reads cheap. Cascading its children costs nothing extra and makes a
-   screen assemble itself. Done in CSS keyed on nth-child so all twenty
-   screens inherit it without a line of per-page code. */
+/* ── application chrome ─────────────────────────────────────────────────── */
 @media (prefers-reduced-motion: no-preference) {
-  .rw-stage > * > * {
-    animation: rw-cascade 0.52s cubic-bezier(0.16, 1, 0.3, 1) both;
-  }
-  .rw-stage > * > *:nth-child(1)  { animation-delay: 0.00s }
-  .rw-stage > * > *:nth-child(2)  { animation-delay: 0.045s }
-  .rw-stage > * > *:nth-child(3)  { animation-delay: 0.09s }
-  .rw-stage > * > *:nth-child(4)  { animation-delay: 0.13s }
-  .rw-stage > * > *:nth-child(5)  { animation-delay: 0.165s }
-  .rw-stage > * > *:nth-child(6)  { animation-delay: 0.195s }
-  .rw-stage > * > *:nth-child(7)  { animation-delay: 0.22s }
-  .rw-stage > * > *:nth-child(8)  { animation-delay: 0.24s }
-  /* the tail flattens — a visitor should never wait on decoration */
-  .rw-stage > * > *:nth-child(n+9) { animation-delay: 0.255s }
+  .rw-stage > * > * { animation: rw-cascade 0.48s cubic-bezier(0.16, 1, 0.3, 1) both; }
+  .rw-stage > * > *:nth-child(1) { animation-delay: 0s }
+  .rw-stage > * > *:nth-child(2) { animation-delay: .04s }
+  .rw-stage > * > *:nth-child(3) { animation-delay: .08s }
+  .rw-stage > * > *:nth-child(4) { animation-delay: .12s }
+  .rw-stage > * > *:nth-child(5) { animation-delay: .15s }
+  .rw-stage > * > *:nth-child(6) { animation-delay: .18s }
+  .rw-stage > * > *:nth-child(7) { animation-delay: .2s }
+  .rw-stage > * > *:nth-child(8) { animation-delay: .22s }
+  .rw-stage > * > *:nth-child(n+9) { animation-delay: .24s }
 }
-@keyframes rw-cascade {
-  from { opacity: 0; transform: translate3d(0, 10px, 0); }
-  to   { opacity: 1; transform: none; }
-}
+@keyframes rw-cascade { from { opacity: 0; transform: translate3d(0, 8px, 0); } to { opacity: 1; transform: none; } }
 
-/* ── 2. route progress ─────────────────────────────────────────────
-   A navigation that recomputes a forecast is not instant. Saying so is
-   better than a frozen screen. */
-@keyframes rw-route-progress {
-  0%   { transform: scaleX(0);    opacity: 1 }
-  60%  { transform: scaleX(0.72); opacity: 1 }
-  100% { transform: scaleX(1);    opacity: 0 }
-}
+@keyframes rw-route-progress { 0% { transform: scaleX(0); opacity: 1 } 60% { transform: scaleX(.72); opacity: 1 } 100% { transform: scaleX(1); opacity: 0 } }
 .rw-route-bar {
   position: fixed; inset-inline: 0; top: 0; height: 2px; z-index: 60;
   transform-origin: 0 50%;
-  background: linear-gradient(90deg,
-    transparent, var(--state-actual), var(--primary) 70%, var(--primary));
-  box-shadow: 0 0 12px -2px var(--primary);
-  animation: rw-route-progress 0.9s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+  background: linear-gradient(90deg, transparent, var(--forest-3), var(--lime) 75%, var(--lime));
+  animation: rw-route-progress .9s cubic-bezier(0.16, 1, 0.3, 1) forwards;
 }
-@media (prefers-reduced-motion: reduce) { .rw-route-bar { display: none } }
 
-/* ── 3. scrollbars ─────────────────────────────────────────────────
-   The default scrollbar is the one piece of chrome that gives away an
-   unfinished build on a dark page. */
-* { scrollbar-width: thin; scrollbar-color: var(--border-strong) transparent; }
+* { scrollbar-width: thin; scrollbar-color: var(--line-2) transparent; }
 *::-webkit-scrollbar { width: 10px; height: 10px; }
 *::-webkit-scrollbar-track { background: transparent; }
-*::-webkit-scrollbar-thumb {
-  background: var(--border-strong);
-  border: 3px solid transparent;
-  border-radius: 999px;
-  background-clip: padding-box;
-}
-*::-webkit-scrollbar-thumb:hover { background: var(--muted-foreground); background-clip: padding-box; }
-*::-webkit-scrollbar-corner { background: transparent; }
+*::-webkit-scrollbar-thumb { background: var(--line-2); border: 3px solid transparent; border-radius: 999px; background-clip: padding-box; }
+*::-webkit-scrollbar-thumb:hover { background: var(--ink-3); background-clip: padding-box; }
 
-/* ── 4. selection and focus ────────────────────────────────────────── */
-::selection { background: color-mix(in oklab, var(--primary) 28%, transparent); color: var(--foreground); }
-:focus-visible { outline: 2px solid color-mix(in oklab, var(--primary) 60%, transparent); outline-offset: 2px; }
+::selection { background: var(--lime); color: var(--forest); }
+:focus-visible { outline: 2px solid var(--forest-3); outline-offset: 2px; }
 
-/* ── 5. a hairline that actually looks drawn ───────────────────────
-   A flat 1px border meets the page edge and stops dead. Fading both
-   ends is what separates a designed rule from a default one. */
-.rw-hairline {
-  height: 1px; border: 0;
-  background: linear-gradient(90deg, transparent, var(--border-strong) 18%,
-                              var(--border-strong) 82%, transparent);
+.rw-hairline { height: 1px; border: 0; background: var(--line); }
+.rw-rail-dot { position: relative; display: block; height: 7px; width: 7px; border-radius: 999px; background: var(--line-2); transition: background-color .35s ease, transform .35s cubic-bezier(0.16, 1, 0.3, 1); }
+.rw-rail-dot[data-on="true"] { background: var(--forest); transform: scale(1.5); }
+.rw-rail-dot[data-on="true"]::after { content: ""; position: absolute; inset: -5px; border-radius: 999px; border: 1px solid rgba(12,59,42,.35); }
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation-duration: 0.001ms !important; animation-iteration-count: 1 !important; transition-duration: 0.001ms !important; scroll-behavior: auto !important; }
+  .rw-route-bar { display: none; }
 }
 
-/* ── 6. the chapter rail (landing) ───────────────────────────────── */
-.rw-rail-dot {
-  position: relative; display: block; height: 7px; width: 7px;
-  border-radius: 999px; background: var(--border-strong);
-  transition: background-color 0.35s ease, transform 0.35s cubic-bezier(0.16, 1, 0.3, 1);
-}
-.rw-rail-dot[data-on="true"] { background: var(--primary); transform: scale(1.5); }
-.rw-rail-dot[data-on="true"]::after {
-  content: ""; position: absolute; inset: -5px; border-radius: 999px;
-  border: 1px solid color-mix(in oklab, var(--primary) 45%, transparent);
-}
-
-/* ── 7. the intro curtain ────────────────────────────────────────── */
-@keyframes rw-curtain-lift {
-  0%   { clip-path: inset(0 0 0 0);     opacity: 1 }
-  100% { clip-path: inset(0 0 100% 0);  opacity: 1 }
-}
-@keyframes rw-curtain-mark { 0% { opacity: 0; transform: translateY(8px) } 100% { opacity: 1; transform: none } }
-@keyframes rw-curtain-sweep { from { transform: translateX(-100%) } to { transform: none } }
-
-/* ── 8. print ──────────────────────────────────────────────────────
-   A shared passport gets printed and put in a credit file. On paper the
-   dark theme is a toner crime, so force the light ladder and drop every
-   piece of chrome that only makes sense on screen. */
+/* A shared passport gets printed. Force the paper ladder, drop screen chrome. */
 @media print {
   :root {
     color-scheme: light;
-    --background: #ffffff; --foreground: #111827;
+    --background: #ffffff; --foreground: #10201a;
     --card: #ffffff; --surface: #ffffff;
     --border: #d4d4d8; --border-strong: #a1a1aa;
     --muted-foreground: #52525b;
   }
   html, body { background: #fff !important; }
-  .rw-noise::after, .rw-route-bar, .rw-rail-dot { display: none !important; }
+  .rw-noise::after, .rw-route-bar, .rw-rail-dot, .no-print { display: none !important; }
   nav[aria-label="Page sections"] { display: none !important; }
-  .rw-card { box-shadow: none !important; border-color: #d4d4d8 !important; }
+  .rw-card, .card, .card-flat { box-shadow: none !important; border-color: #d4d4d8 !important; }
   .rw-stage > * > * { animation: none !important; opacity: 1 !important; transform: none !important; }
   .break-inside-avoid { break-inside: avoid; page-break-inside: avoid; }
-  a[href]::after { content: "" }  /* no URL noise after every link */
+  a[href]::after { content: "" }
 }
