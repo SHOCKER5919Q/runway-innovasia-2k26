@@ -46,14 +46,15 @@ export function useApi<T>(path: string | null, deps: unknown[] = []): Async<T> {
 export function useMutation<TIn, TOut>(fn: (input: TIn) => Promise<TOut>) {
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const run = useCallback(async (input: TIn) => {
+  const fnRef = useRef(fn);
+  fnRef.current = fn;
+  const run = useCallback(async (input: TIn): Promise<TOut | undefined> => {
     setPending(true); setError(null);
-    try { return await fn(input); }
+    try { return await fnRef.current(input); }
     catch (e) {
       setError(e instanceof ApiError ? e.message : String(e));
-      throw e;
+      return undefined;
     } finally { setPending(false); }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
   return { run, pending, error, setError };
 }

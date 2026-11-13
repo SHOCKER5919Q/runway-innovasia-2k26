@@ -66,10 +66,12 @@ export default function RiskPage() {
                </div>}
              bodyClass="p-0">
         <ul className="divide-y divide-border">
-          {alerts.map((a: any) => (
-            <li key={a.code + a.title}>
-              <button onClick={() => setOpen(open === a.code + a.title ? null : a.code + a.title)}
-                      aria-expanded={open === a.code + a.title}
+          {alerts.map((a: any, idx: number) => {
+            const alertKey = `${a.code}:${a.title}:${idx}`;
+            return (
+            <li key={alertKey}>
+              <button onClick={() => setOpen(open === alertKey ? null : alertKey)}
+                      aria-expanded={open === alertKey}
                       className="flex w-full items-start gap-3 px-4 py-3 text-left hover:bg-surface-hover">
                 <span className="mt-0.5 shrink-0"><LevelPill level={a.level} /></span>
                 <span className="min-w-0 flex-1">
@@ -84,7 +86,7 @@ export default function RiskPage() {
                   </span>
                 )}
               </button>
-              {open === a.code + a.title && (
+              {open === alertKey && (
                 <div className="space-y-3 border-t border-border bg-surface/40 px-4 py-4 text-[13px]">
                   <Field label="What happened">{a.what_happened}</Field>
                   <Field label="Why it matters">{a.why_it_matters}</Field>
@@ -105,7 +107,8 @@ export default function RiskPage() {
                 </div>
               )}
             </li>
-          ))}
+            );
+          })}
           {alerts.length === 0 && (
             <li className="px-4 py-12 text-center text-sm text-muted-foreground">
               No alerts at this level. That is a result, not an empty screen.
