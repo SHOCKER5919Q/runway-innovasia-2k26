@@ -8,13 +8,13 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel, Field
 
 from app.api.common import jsonable, money, today_param
-from app.api.deps import DbDep, Tenant, audit
+from app.api.deps import DbDep, Tenant, audit, resolved_as_of
 from app.core.enums import Role
 from app.core.money import format_inr
 from app.digital_twin.digital_twin_service import get_bundle, invalidate
 
 router = APIRouter(prefix="/api", tags=["core"])
-AsOf = Annotated[date, Depends(today_param)]
+AsOf = Annotated[date, Depends(resolved_as_of)]
 
 
 @router.get("/overview")

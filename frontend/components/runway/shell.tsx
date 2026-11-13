@@ -208,7 +208,6 @@ export function AppShell({ children }: { children: React.ReactNode }) {
           </div>
         </main>
 
-        {overview.data?.business?.is_demo && <DemoRibbon scenario={overview.data.business.demo_scenario} />}
       </div>
 
       <CommandPalette open={paletteOpen} onClose={() => setPaletteOpen(false)} items={items} />

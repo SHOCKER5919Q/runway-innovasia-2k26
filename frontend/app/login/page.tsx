@@ -23,7 +23,9 @@ export default function LoginPage() {
     api.get<{ accounts: DemoAccount[] }>("/api/auth/demo-accounts")
       .then((r) => setAccounts(r.accounts)).catch(() => {});
     // Pin the demo clock so a judge sees the same workspace the docs describe.
-    if (!session.asOf) session.setAsOf("2026-11-07");
+    // No pinned date: the books open on each business's latest ledger day.
+    // A date chosen in Settings still overrides it.
+    session.setAsOf(null);
   }, []);
 
   async function submit(e: React.FormEvent, overrideEmail?: string, overridePw?: string) {

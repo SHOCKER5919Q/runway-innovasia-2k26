@@ -7,7 +7,7 @@ from fastapi import APIRouter, Depends, File, Form, HTTPException, Query, Upload
 from sqlalchemy import func, select
 
 from app.api.common import jsonable, money, today_param
-from app.api.deps import DbDep, Tenant, audit
+from app.api.deps import DbDep, Tenant, audit, resolved_as_of
 from app.core.enums import Role
 from app.digital_twin.digital_twin_service import invalidate
 from app.integrations.history import import_with_impact
@@ -16,7 +16,7 @@ from app.integrations.service import catalogue, import_file
 from app.models import Account, ImportBatch, Transaction, _uid
 
 router = APIRouter(prefix="/api/integrations", tags=["integrations"])
-AsOf = Annotated[date, Depends(today_param)]
+AsOf = Annotated[date, Depends(resolved_as_of)]
 MAX_UPLOAD_BYTES = 12 * 1024 * 1024
 
 

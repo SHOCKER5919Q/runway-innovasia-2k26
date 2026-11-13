@@ -9,7 +9,7 @@ from pydantic import BaseModel, Field
 from sqlalchemy import select
 
 from app.api.common import jsonable, money, today_param
-from app.api.deps import DbDep, Tenant, audit
+from app.api.deps import DbDep, Tenant, audit, resolved_as_of
 from app.core.db import as_utc
 from app.core.enums import Role
 from app.core.money import format_inr
@@ -17,7 +17,7 @@ from app.digital_twin.digital_twin_service import get_bundle
 from app.models import Consent, SharedReport, _uid
 
 router = APIRouter(prefix="/api/reports", tags=["reports"])
-AsOf = Annotated[date, Depends(today_param)]
+AsOf = Annotated[date, Depends(resolved_as_of)]
 
 
 def _passport(db, business_id: str, as_of: date) -> dict:

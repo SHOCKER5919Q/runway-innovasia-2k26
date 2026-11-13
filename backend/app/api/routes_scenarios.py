@@ -9,7 +9,7 @@ from pydantic import BaseModel, Field
 from sqlalchemy import select
 
 from app.api.common import jsonable, money, today_param
-from app.api.deps import DbDep, Tenant, audit
+from app.api.deps import DbDep, Tenant, audit, resolved_as_of
 from app.core.config import settings
 from app.core.enums import DecisionStatus, Role, ScenarioKind
 from app.digital_twin.digital_twin_service import get_bundle
@@ -20,7 +20,7 @@ from app.financial_states.state_manager import (
 from app.models import Scenario, ScenarioDecision, SimulatedSnapshot, _uid
 
 router = APIRouter(prefix="/api/scenarios", tags=["scenarios"])
-AsOf = Annotated[date, Depends(today_param)]
+AsOf = Annotated[date, Depends(resolved_as_of)]
 
 
 class ScenarioIn(BaseModel):

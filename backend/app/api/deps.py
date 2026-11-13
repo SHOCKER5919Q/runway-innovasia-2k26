@@ -1,8 +1,9 @@
 from __future__ import annotations
 
+from datetime import date
 from typing import Annotated
 
-from fastapi import Depends, Header, HTTPException, Request, status
+from fastapi import Depends, Header, HTTPException, Query, Request, status
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
@@ -101,3 +102,29 @@ def audit(db: Session, ctx: TenantContext | None, action: str, *,
         detail_json=detail or {},
         ip=(request.client.host if request and request.client else None),
     ))
+
+
+
+def resolved_as_of(
+    db: DbDep, ctx: Tenant,
+    as_of: Annotated[str | None, Query(description="ISO date to evaluate as 'today'")] = None,
+) -> date:
+    """The as-of date for a request.
+
+    An explicit ``as_of`` wins (point-in-time views, Settings override).
+    Otherwise the books are shown as of the latest day the ledger has data
+    for - so a statement imported for 12 Nov shows up as 12 Nov at once,
+    instead of the screens staying on a pinned date or on a "today" with no
+    data yet. Never later than today.
+    """
+    if as_of:
+        return date.fromisoformat(as_of)
+    from sqlalchemy import func
+    from app.models import Invoice, Transaction
+    t = db.scalar(select(func.max(Transaction.value_date)).where(
+        Transaction.business_id == ctx.business_id))
+    i = db.scalar(select(func.max(Invoice.issue_date)).where(
+        Invoice.business_id == ctx.business_id))
+    latest = max([d for d in (t, i) if d is not None], default=None)
+    today = date.today()
+    return min(latest, today) if latest else today

@@ -30,19 +30,29 @@ def import_file(db, *, business_id: str, account_id: str, adapter_key: str,
         raise ValueError("account not found in this business")
 
     parsed, report = adapter.parse(content, filename=filename)
-    # Wrong importer picked? An invoice register (Invoice No + Customer /
-    # Supplier Name) sent to the bank-statement reader yields no rows. Detect
-    # it and use the invoice-register reader instead, saying so.
-    if not parsed and adapter_key in ("bank_csv", "upi_settlement_csv"):
-        head = content[:600].decode("utf-8-sig", errors="replace").lower()
-        if "invoice" in head and any(k in head for k in ("customer", "supplier", "party", "gstin")):
-            alt = REGISTRY.get("gst_invoice_json")
-            p2, r2 = alt.parse(content, filename=filename)
+    # Wrong importer picked? Rather than read 0 rows, try the others that
+    # accept this kind of file and use the first that reads something,
+    # saying so. (A sales register sent to "Bank statement" used to show 0.)
+    if not parsed:
+        low = (filename or "").lower()
+        order = (["pdf_invoice"] if low.endswith(".pdf") else
+                 ["tally_xml"] if low.endswith(".xml") else
+                 ["gst_invoice_json", "bank_csv"] if low.endswith(".json") else
+                 ["bank_csv"] if low.endswith((".xlsx", ".xlsm")) else
+                 ["gst_invoice_json", "upi_settlement_csv", "bank_csv", "tally_xml"])
+        for key in order:
+            if key == adapter_key or key not in REGISTRY:
+                continue
+            try:
+                p2, r2 = REGISTRY[key].parse(content, filename=filename)
+            except Exception:
+                continue
             if p2:
-                parsed, report, adapter_key = p2, r2, "gst_invoice_json"
-                report.warnings.insert(0, "This file is an invoice register, not a bank "
-                                          "statement - it was read with the GST invoice "
-                                          "register importer instead.")
+                label = REGISTRY[key].label
+                parsed, report, adapter_key = p2, r2, key
+                report.warnings.insert(0, f"Read with the '{label}' importer - the one "
+                                          f"selected could not read this file.")
+                break
     batch = ImportBatch(id=_uid(), business_id=business_id, adapter=adapter_key,
                         filename=filename, status="parsed",
                         rows_seen=report.rows_seen, rows_rejected=report.rows_rejected,

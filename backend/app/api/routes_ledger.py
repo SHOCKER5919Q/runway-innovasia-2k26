@@ -9,13 +9,13 @@ from pydantic import BaseModel, Field
 from sqlalchemy import func, or_, select
 
 from app.api.common import jsonable, money, today_param
-from app.api.deps import DbDep, Tenant, audit
+from app.api.deps import DbDep, Tenant, audit, resolved_as_of
 from app.core.enums import Direction, Evidence, InvoiceKind, InvoiceStatus, ReconStatus, Role
 from app.digital_twin.digital_twin_service import get_bundle, invalidate
 from app.models import Allocation, Counterparty, Invoice, Transaction
 
 router = APIRouter(prefix="/api", tags=["ledger"])
-AsOf = Annotated[date, Depends(today_param)]
+AsOf = Annotated[date, Depends(resolved_as_of)]
 
 
 @router.get("/transactions")

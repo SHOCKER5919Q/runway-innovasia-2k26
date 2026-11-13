@@ -50,6 +50,10 @@ PATTERNS: list[tuple[str, float, str]] = [
 
 SCENARIO_PATTERNS: list[tuple[str, float, str]] = [
     (ScenarioKind.NEW_ORDER, 4.6, r"(accept|take on|can i afford|should i take).{0,30}\border\b|\bnew order\b|\border (of|worth|for)\b|negotiat\w*.{0,20}advance"),
+    # "Should I accept 7 lakh from ABC?", "a company is offering a 7 lakh order,
+    # should I approve it?" - an amount being accepted/approved/offered is an
+    # order decision. These phrasings used to fall through to no tool at all.
+    (ScenarioKind.NEW_ORDER, 4.7, r"(accept|approve|take|taking|accepting|approving).{0,40}\d[\d,.]*\s*(lakhs?|lacs?|l\b|crores?|cr\b|k\b)|(offer|offering|offered|proposal|deal|contract|po\b|purchase order).{0,40}(\d[\d,.]*\s*(lakhs?|lacs?|crores?|cr\b)|order)|order.{0,40}(approve|accept)|(approve|accept)\w*.{0,40}\border\b"),
     (ScenarioKind.PAYMENT_DELAY, 4.0, r"(pays?|paid).{0,20}\d{1,3}\s*days? (late|later)|delays? payment|pays? late"),
     (ScenarioKind.CUSTOMER_DEFAULT, 4.2, r"\bdefaults?\b|stops paying|never pays|goes (bust|under)|insolven"),
     (ScenarioKind.REVENUE_SHOCK, 4.0, r"revenue (drops?|falls?|declines?|down)|sales (drop|fall)"),

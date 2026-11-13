@@ -8,14 +8,14 @@ from pydantic import BaseModel, Field
 from sqlalchemy import select
 
 from app.api.common import jsonable, today_param
-from app.api.deps import DbDep, Tenant
+from app.api.deps import DbDep, Tenant, resolved_as_of
 from app.copilot import llm, tools
 from app.copilot.service import SUGGESTIONS, ask
 from app.core.security import rate_limiter
 from app.models import CopilotMessage
 
 router = APIRouter(prefix="/api/copilot", tags=["copilot"])
-AsOf = Annotated[date, Depends(today_param)]
+AsOf = Annotated[date, Depends(resolved_as_of)]
 
 
 class AskIn(BaseModel):

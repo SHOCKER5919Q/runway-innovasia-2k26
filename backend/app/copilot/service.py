@@ -10,6 +10,8 @@ from __future__ import annotations
 from datetime import date
 from typing import Any
 
+from sqlalchemy import select
+
 from app.copilot import llm, models, router, tools
 from app.core.money import format_inr
 from app.models import CopilotMessage, _uid
@@ -34,6 +36,10 @@ def ask(db, bundle, question: str, *, conversation_id: str | None = None,
     conv = conversation_id or _uid()
     names = [c.name for c in bundle.behaviour] + [s.name for s in bundle.supplier_profiles]
     intent = router.route(question, known_customers=names)
+    if intent.score <= 0:
+        # Nothing financial matched ("hi", "what can you do", "explain my
+        # business"): answer as an assistant, not by dumping a tool result.
+        return _converse(db, bundle, question, conv, language, model, use_llm)
 
     args = dict(intent.args)
     result = tools.call(intent.tool, bundle, db=db, **args)
@@ -189,3 +195,71 @@ def render(intent, result: dict, b) -> str:
     if tail:
         lines += ["", tail]
     return "\n".join(lines)
+
+
+
+def snapshot(b) -> dict:
+    h = b.actual_snapshot
+    s = b.simulation
+    return {
+        "business": b.business.name, "as_of": b.as_of.isoformat(),
+        "available_cash": format_inr(b.position.available_liquidity_paise),
+        "cash_in_hand": format_inr(b.position.cash_paise),
+        "receivables": format_inr(b.ageing_ar.get("total_paise", 0)),
+        "receivables_overdue": format_inr(b.ageing_ar.get("overdue_paise", 0)),
+        "payables": format_inr(b.ageing_ap.get("total_paise", 0)),
+        "runway_weeks_p10_predicted": round(s.runway_weeks_p10, 1) if s else None,
+        "breach_probability_predicted": f"{s.breach_probability:.0%}" if s else None,
+        "health_score": b.health.get("score"), "health_band": b.health.get("band"),
+        "top_alert": b.findings[0].title if b.findings else None,
+        "top_recommendation": b.recommendations[0].title if b.recommendations else None,
+        "customers": len(b.behaviour), "suppliers": len(b.supplier_profiles),
+        "what_runway_can_do": ["cash position today", "13-week cash forecast",
+                               "who owes you and when they will pay", "supplier dues and "
+                               "MSME deadlines", "test a decision such as a new order, a "
+                               "hire or a loan", "risk alerts and health score"],
+    }
+
+
+def _converse(db, b, question, conv, language, model, use_llm) -> dict:
+    snap = snapshot(b)
+    history = [{"role": m.role, "content": m.content} for m in db.scalars(
+        select(CopilotMessage).where(CopilotMessage.conversation_id == conv)
+        .order_by(CopilotMessage.created_at)).all()] if conv else []
+    reply, generator = (None, "deterministic")
+    model_id, _ = models.resolve(model, "get_actual_state", language)
+    if use_llm and llm.available() and model_id != models.BUILTIN:
+        reply, generator = llm.converse(question, snap, history=history, language=language,
+                                        business_name=b.business.name, model=model_id)
+    if reply is None:
+        q = question.strip().lower()
+        hello = any(w in q for w in ("hi", "hello", "hey", "namaste", "good morning"))
+        thanks = any(w in q for w in ("thank", "thanks", "ok", "great"))
+        lead = ("Hello! " if hello else "You're welcome. " if thanks else "")
+        reply = (f"{lead}Here's {b.business.name} as of {b.as_of:%d %b %Y}: "
+                 f"{snap['available_cash']} available to spend, {snap['receivables']} owed to "
+                 f"you ({snap['receivables_overdue']} overdue) and {snap['payables']} you owe."
+                 + (f" Predicted runway is {snap['runway_weeks_p10_predicted']} weeks in a "
+                    f"bad case." if snap['runway_weeks_p10_predicted'] is not None else "")
+                 + "\n\nAsk me things like \"How much cash do I have?\", \"Who should I "
+                   "chase today?\" or \"Should I accept a 7 lakh order?\"")
+    db.add(CopilotMessage(id=_uid(), business_id=b.business.id, conversation_id=conv,
+                          role="user", content=question[:4000], language=language))
+    db.add(CopilotMessage(id=_uid(), business_id=b.business.id, conversation_id=conv,
+                          role="assistant", content=reply, language=language,
+                          generator=generator, tool_calls_json=[], evidence_json=[],
+                          state_refs_json={"as_of": b.as_of.isoformat()}))
+    db.commit()
+    return {
+        "conversation_id": conv, "question": question, "answer": reply,
+        "generator": generator,
+        "model": {"requested": model or models.AUTO,
+                  "used": generator.split(":", 1)[1] if generator.startswith("llm:") else models.BUILTIN,
+                  "category": "conversation", "category_label": "Conversation"},
+        "tool": None, "state": "actual", "state_label": "Conversation", "ok": True,
+        "data": snap, "evidence": [], "as_of": b.as_of.isoformat(),
+        "state_refs": {}, "disclaimer": None,
+        "followups": ["How much cash do I actually have today?",
+                      "Which invoices should I follow up on today?",
+                      "Should I accept a Rs 7 lakh order on 60-day terms?"],
+    }
