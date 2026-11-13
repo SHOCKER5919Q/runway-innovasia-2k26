@@ -16,6 +16,7 @@ import { api } from "@/lib/api";
 import { useApi, useMutation } from "@/lib/use-api";
 import { inr, money, pct, weeks } from "@/lib/format";
 import { cn } from "@/lib/utils";
+import { Details } from "@/components/runway/page-kit";
 
 type Param = {
   key: string; label: string; kind: string; default: any;
@@ -147,7 +148,11 @@ export default function ScenarioLabPage() {
                     title="Pick a question and press Simulate"
                     description="RUNWAY will run the baseline and your scenario side by side over the same simulated futures, then show exactly what changed."
                   />
-                  <Provenance>{cat.data.isolation} {cat.data.reproducibility}</Provenance>
+                  <div className="mt-3">
+            <Details label="How this is calculated">
+              {cat.data.isolation} {cat.data.reproducibility}
+            </Details>
+          </div>
                 </Panel>
               </motion.div>
             )}
@@ -390,8 +395,16 @@ function ScenarioResult({ result }: { result: any }) {
           </div>
         ) : null}
 
-        {econ.disclaimer && <Provenance>{econ.disclaimer}</Provenance>}
-        <Provenance>{result.isolation_guarantee ?? "Nothing was written to your ledger."}</Provenance>
+        {econ.disclaimer && <div className="mt-3">
+            <Details label="How this is calculated">
+              {econ.disclaimer}
+            </Details>
+          </div>}
+        <div className="mt-3">
+            <Details label="How this is calculated">
+              {result.isolation_guarantee ?? "Nothing was written to your ledger."}
+            </Details>
+          </div>
       </Panel>
     </>
   );
@@ -441,7 +454,11 @@ function LongHorizon({ lh }: { lh: any }) {
               tone={lh.breach_delta > 0 ? "loss" : "gain"} state="simulated" />
       </div>
       <div className="px-2 pb-1">
-        <Provenance>{lh.interpretation}</Provenance>
+        <div className="mt-3">
+            <Details label="How this is calculated">
+              {lh.interpretation}
+            </Details>
+          </div>
       </div>
     </Panel>
   );

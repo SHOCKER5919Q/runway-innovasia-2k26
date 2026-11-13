@@ -9,6 +9,7 @@ import {
   ErrorState, Evidence, LoadingPanel, Panel, Provenance, SectionHeader, Stat, StateBadge,
 } from "@/components/runway/primitives";
 import { Reveal, EASE_OUT } from "@/components/runway/motion";
+import { Details, Note, PageHeader } from "@/components/runway/page-kit";
 import { useApi } from "@/lib/use-api";
 import { inr, longDate, money, pct, shortDate, weeks, STATE_META } from "@/lib/format";
 import { cn } from "@/lib/utils";
@@ -26,10 +27,9 @@ export default function StateCentrePage() {
 
   return (
     <div className="space-y-6">
-      <SectionHeader
-        title="Business State Centre"
-        description="RUNWAY keeps three separate representations of your business. They are stored separately, versioned separately and never mixed — which is what stops an expectation being read as a fact."
-      />
+      <PageHeader
+        title="Business state centre"
+        subtitle="Three representations of your business, stored and versioned separately — so an expectation is never read as a fact." />
 
       {/* state selector */}
       <div className="grid gap-3 sm:grid-cols-3">
@@ -140,10 +140,12 @@ function ActualView({ data, loading }: { data: any; loading: boolean }) {
               </tbody>
             </table>
           </div>
-          <Provenance>
-            Opening balance + credits − debits = closing balance holds exactly for every
+          <div className="mt-3">
+            <Details label="How this is calculated">
+              Opening balance + credits − debits = closing balance holds exactly for every
             account. Amounts are stored as integer paise, so no rounding drift is possible.
-          </Provenance>
+            </Details>
+          </div>
         </Panel>
 
         <Panel title="Committed cash" description="What has already been spoken for">
@@ -186,7 +188,11 @@ function PredictedView({ data, loading, recon }: { data: any; loading: boolean; 
                 state="predicted" />
         </div>
         <div className="px-2 pb-2">
-          <Provenance>{data.quantile_convention}</Provenance>
+          <div className="mt-3">
+            <Details label="How this is calculated">
+              {data.quantile_convention}
+            </Details>
+          </div>
         </div>
       </Panel>
 
@@ -248,7 +254,11 @@ function PredictedView({ data, loading, recon }: { data: any; loading: boolean; 
                   P10–P90 band against an 80% target.
                 </p>
               )}
-              <Provenance>{recon.interpretation}</Provenance>
+              <div className="mt-3">
+            <Details label="How this is calculated">
+              {recon.interpretation}
+            </Details>
+          </div>
             </>
           ) : (
             <p className="py-8 text-center text-sm text-muted-foreground text-pretty">
@@ -320,10 +330,12 @@ function SimulatedView({ scenarios }: { scenarios: any }) {
           </table>
         </div>
       )}
-      <Provenance>
-        A simulated payment is not a payment and a simulated loan is not a liability.
+      <div className="mt-3">
+            <Details label="How this is calculated">
+              A simulated payment is not a payment and a simulated loan is not a liability.
         There is no code path from the scenario engine to a ledger table.
-      </Provenance>
+            </Details>
+          </div>
     </Panel>
   );
 }

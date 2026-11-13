@@ -9,6 +9,7 @@ import { motion } from "motion/react";
 import {
   ErrorState, Evidence, LoadingPanel, Panel, Provenance, SectionHeader, Stat, StateBadge,
 } from "@/components/runway/primitives";
+import { Details } from "@/components/runway/page-kit";
 import { useApi } from "@/lib/use-api";
 import { inr, longDate, money, pct, shortDate, titleCase, weeks } from "@/lib/format";
 import { cn } from "@/lib/utils";
@@ -105,7 +106,11 @@ export default function TwinPage() {
               </li>
             ))}
           </ul>
-          <Provenance>{d.operational_state.note}</Provenance>
+          <div className="mt-3">
+            <Details label="How this is calculated">
+              {d.operational_state.note}
+            </Details>
+          </div>
         </Panel>
       </div>
 
@@ -332,11 +337,13 @@ function TimelineView({ data, loading }: { data: any; loading: boolean }) {
             </tbody>
           </table>
         </div>
-        <Provenance>
-          "Predicted share" is how much of that week's movement rests on a model estimate
+        <div className="mt-3">
+            <Details label="Where these numbers come from">
+              "Predicted share" is how much of that week's movement rests on a model estimate
           rather than a dated commitment. A high share means the week is less certain than
           the totals suggest.
-        </Provenance>
+            </Details>
+          </div>
       </Panel>
     </div>
   );

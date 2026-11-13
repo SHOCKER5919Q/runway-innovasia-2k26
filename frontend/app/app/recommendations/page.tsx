@@ -7,6 +7,7 @@ import {
   ErrorState, Evidence, LoadingPanel, Panel, Provenance, SectionHeader,
 } from "@/components/runway/primitives";
 import { api } from "@/lib/api";
+import { Details, Note, PageHeader } from "@/components/runway/page-kit";
 import { useApi } from "@/lib/use-api";
 import { inr, money, pct, shortDate } from "@/lib/format";
 import { cn } from "@/lib/utils";
@@ -27,9 +28,9 @@ export default function RecommendationsPage() {
 
   return (
     <div className="space-y-5">
-      <SectionHeader
+      <PageHeader
         title="Recommendations"
-        description="Deterministic rules over your ledger, ranked by a published score. No language model decides what you should do." />
+        subtitle="Deterministic rules over your ledger, ranked by a published score." />
 
       <div className="rw-surface flex items-start gap-3 p-3.5">
         <ShieldCheck className="mt-0.5 size-4 shrink-0 text-fin-gain" aria-hidden />

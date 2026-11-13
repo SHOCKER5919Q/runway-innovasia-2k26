@@ -290,6 +290,24 @@
     @apply inline-flex h-5 min-w-5 items-center justify-center rounded border
            border-border bg-surface px-1.5 font-mono text-[10px] text-muted-foreground;
   }
+  /* Tab bar: one row of equal-weight panes, scrollable on narrow screens
+     rather than wrapping into a second line of unreadable crumbs. */
+  .rw-tabs {
+    @apply mb-4 flex items-center gap-1 overflow-x-auto rounded-lg border
+           border-border bg-surface/60 p-1;
+    scrollbar-width: none;
+  }
+  .rw-tabs::-webkit-scrollbar { display: none; }
+  .rw-tab {
+    @apply inline-flex shrink-0 items-center gap-1.5 rounded-md px-3 py-1.5
+           text-[13px] font-medium text-muted-foreground transition-colors
+           hover:text-foreground;
+  }
+  .rw-tab.is-active {
+    @apply bg-card text-foreground shadow-sm;
+    box-shadow: var(--shadow-card);
+  }
+  .rw-tab:focus-visible { @apply outline-none ring-2 ring-primary/50; }
 }
 
 @layer utilities {

@@ -18,6 +18,9 @@ READ_ENDPOINTS = [
     "/api/scenarios", "/api/scenarios/catalogue", "/api/reports/passport",
     "/api/integrations", "/api/integrations/accounts", "/api/integrations/batches",
     "/api/copilot/suggestions", "/api/copilot/tools",
+    # CSV endpoints are excluded here on purpose: this list asserts a JSON
+    # body. Their contract is covered in tests/test_entry_and_export.py.
+    "/api/briefing/whatsapp", "/api/briefing/email",
 ]
 
 

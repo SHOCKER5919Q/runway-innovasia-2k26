@@ -8,6 +8,7 @@ import {
   ErrorState, Evidence, LoadingPanel, Panel, Provenance, RiskBand, SectionHeader,
   Stat, StateBadge,
 } from "@/components/runway/primitives";
+import { Details, Note, PageHeader } from "@/components/runway/page-kit";
 import { useApi } from "@/lib/use-api";
 import { inr, pct, shortDate } from "@/lib/format";
 import { cn } from "@/lib/utils";
@@ -32,10 +33,10 @@ function CustomersPage() {
 
   return (
     <div className="space-y-5">
-      <SectionHeader
+      <PageHeader
         title="Customers"
-        description="Payment behaviour per buyer, computed only from invoices they have actually settled."
-        actions={<StateBadge state="actual" />} />
+        subtitle="Payment behaviour per buyer, computed only from invoices they have actually settled."
+        state={<StateBadge state="actual" />} />
 
       <div className="grid gap-4 lg:grid-cols-[1.4fr_1fr]">
         <Panel title="Delay against exposure"
@@ -102,11 +103,13 @@ function CustomersPage() {
           </table>
         </div>
         <div className="px-4 pb-3">
-          <Provenance>
-            Reliability blends punctuality (55%), consistency of timing (25%) and current
+          <div className="mt-3">
+            <Details label="How this is calculated">
+              Reliability blends punctuality (55%), consistency of timing (25%) and current
             overdue exposure (20%). Open invoices are excluded from the delay statistics
             because an unpaid invoice says nothing about how fast someone pays.
-          </Provenance>
+            </Details>
+          </div>
         </div>
       </Panel>
     </div>

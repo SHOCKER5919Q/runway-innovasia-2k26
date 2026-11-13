@@ -7,7 +7,8 @@ import numpy as np
 import pytest
 from sqlalchemy import select
 
-from app.forecast.cashflow import build_inputs
+from app.forecast.cashflow import (COUPLING_CAP, build_inputs,
+                                   estimate_revenue_delay_coupling)
 from app.forecast.monte_carlo import simulate
 from app.forecast.payment_delay import predict_open, train
 from app.models import Business, Invoice
@@ -16,7 +17,9 @@ TODAY = date(2026, 11, 7)
 
 
 @pytest.fixture(scope="module")
-def trained(request):
+def trained(seeded):
+    """``seeded`` is session-scoped, so depending on it lets this file run on
+    its own instead of only as part of the full suite."""
     from app.core.db import SessionLocal
     db = SessionLocal()
     biz = db.scalars(select(Business).where(Business.is_demo.is_(True))).first()
@@ -179,3 +182,131 @@ def test_probability_fields_are_probabilities(sim):
     assert 0.0 <= s.breach_probability <= 1.0
     assert 0.0 <= s.negative_cash_probability <= 1.0
     assert all(0.0 <= p <= 1.0 for p in s.breach_prob_by_week)
+
+
+# ── revenue / payment-delay coupling ──────────────────────────────
+
+def test_coupling_is_estimated_from_the_ledger_and_bounded(trained):
+    db, biz, _, _ = trained
+    coupling, meta = estimate_revenue_delay_coupling(db, biz.id, TODAY)
+    assert 0.0 <= coupling <= 0.60, "the estimate is capped so it cannot dominate"
+    assert 0.0 <= coupling <= COUPLING_CAP
+    if meta["estimate"] is not None:
+        # Only the *negative* part of the correlation is used: a positive
+        # correlation is not evidence that bad months make customers slow.
+        assert coupling == pytest.approx(meta["coupling"], abs=1e-3)
+        assert meta["coupling"] == pytest.approx(max(0.0, -meta["estimate"]), abs=1e-3)
+        assert meta["months_used"] >= 6
+    else:
+        assert coupling == 0.0
+
+
+def test_coupling_zero_is_bit_identical_to_no_market_factor(sim):
+    """Turning the coupling off must not perturb any other draw.
+
+    This is what makes the feature safe to ship behind an estimate: a
+    business whose ledger shows no revenue/delay signal gets exactly the
+    simulation it had before.
+    """
+    fi, _ = sim
+    off = fi.copy()
+    off.revenue_delay_coupling = 0.0
+    a = simulate(off, paths=400, seed=11)
+    b = simulate(off, paths=400, seed=11)
+    assert a.p50 == b.p50
+    baseline = simulate(off, paths=400, seed=11).min_cash_p10_paise
+    on = fi.copy()
+    on.revenue_delay_coupling = 0.0
+    assert simulate(on, paths=400, seed=11).min_cash_p10_paise == baseline
+
+
+def test_coupling_widens_the_bad_tail_and_never_the_good_one(sim):
+    """A downturn path is simultaneously lighter on sales *and* slower to pay.
+
+    The whole point of the coupling: it must make the pessimistic tail worse.
+    It must not improve the optimistic tail, because a strong market does not
+    make customers pay early - it only leaves the predicted dates alone.
+    """
+    fi, base = sim
+    off = fi.copy()
+    off.revenue_delay_coupling = 0.0
+    base = simulate(off, paths=2500, seed=5)
+    on = fi.copy()
+    on.revenue_delay_coupling = 0.60
+    coupled = simulate(on, paths=2500, seed=5)
+
+    assert coupled.min_cash_p10_paise < base.min_cash_p10_paise, (
+        "the pessimistic tail must get deeper when demand and delay move together")
+    assert coupled.liquidity_cvar_paise >= base.liquidity_cvar_paise
+    assert coupled.p90[-1] <= base.p90[-1], (
+        "the optimistic path must not be flattered by the coupling")
+
+
+def test_coupling_bites_the_bad_tail_hardest(sim):
+    """A one-sided effect must be largest where it hurts and smallest where
+    it flatters - the signature of a downside risk, not a blanket haircut.
+
+    If the pessimistic and optimistic quantiles moved by the same proportion
+    the coupling would just be shifting the whole distribution down, which
+    would mean the delay term was no longer one-sided.
+    """
+    fi, _ = sim
+    off = fi.copy()
+    off.revenue_delay_coupling = 0.0
+    base = simulate(off, paths=2500, seed=3)
+    on = fi.copy()
+    on.revenue_delay_coupling = 0.30
+    coupled = simulate(on, paths=2500, seed=3)
+
+    def rel(new, old):
+        return abs(new - old) / max(1, abs(old))
+
+    d_p10 = rel(coupled.min_cash_p10_paise, base.min_cash_p10_paise)
+    d_p50 = rel(coupled.min_cash_p50_paise, base.min_cash_p50_paise)
+    d_p90 = rel(coupled.min_cash_p90_paise, base.min_cash_p90_paise)
+    assert d_p10 > d_p50 > d_p90, (
+        f"effect must decay towards the good tail, got P10 {d_p10:.2f}, "
+        f"P50 {d_p50:.2f}, P90 {d_p90:.2f}")
+
+
+def test_coupling_uses_its_own_random_stream(sim):
+    """Switching the coupling on must not reshuffle the other draws.
+
+    Without this, a sensitivity row like "coupling doubled" would mix the
+    real effect with sampling noise, because every other random variable in
+    the model would be redrawn from a different point in the stream.
+    """
+    from app.forecast.cashflow import ForecastInputs
+    # A ledger with only operating costs and unplanned shocks: nothing the
+    # coupling is allowed to touch. If the market factor were drawn from the
+    # main stream, turning it on would reshuffle these draws too.
+    def costs_only(coupling):
+        return ForecastInputs(
+            as_of=TODAY, horizon_weeks=13, opening_cash_paise=50_000_00,
+            restricted_paise=0, overdraft_limit_paise=0, safety_buffer_paise=0,
+            weekly_opex_paise=2_00_000_00, opex_cv=0.12,
+            shock_weekly_rate=0.06, shock_mean_paise=60_000_00,
+            revenue_delay_coupling=coupling)
+
+    off = simulate(costs_only(0.0), paths=600, seed=21)
+    on = simulate(costs_only(0.60), paths=600, seed=21)
+    assert on.outflow_p50 == off.outflow_p50
+    assert on.p50 == off.p50
+
+
+def test_coupling_scales_monotonically(sim):
+    fi, _ = sim
+    mins = []
+    for c in (0.0, 0.2, 0.4, 0.6):
+        f = fi.copy()
+        f.revenue_delay_coupling = c
+        mins.append(simulate(f, paths=1200, seed=13).min_cash_p10_paise)
+    assert mins == sorted(mins, reverse=True), (
+        f"deeper coupling must deepen the P10 trough, got {mins}")
+
+
+def test_coupling_is_disclosed_in_the_assumptions(sim):
+    _, s = sim
+    assert "revenue_delay_coupling" in s.assumptions
+    assert "revenue_delay_coupling_note" in s.assumptions
+    assert "one-sided" in s.assumptions["revenue_delay_coupling_note"]

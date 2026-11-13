@@ -10,6 +10,7 @@ import {
 } from "@/components/runway/primitives";
 import { EASE_OUT } from "@/components/runway/motion";
 import { api } from "@/lib/api";
+import { Details } from "@/components/runway/page-kit";
 import { useApi } from "@/lib/use-api";
 import { cn } from "@/lib/utils";
 
@@ -146,7 +147,11 @@ export default function CopilotPage() {
                     <p className="whitespace-pre-wrap text-[13px] leading-relaxed text-pretty">
                       {t.text}
                     </p>
-                    {t.disclaimer && <Provenance>{t.disclaimer}</Provenance>}
+                    {t.disclaimer && <div className="mt-3">
+            <Details label="How this is calculated">
+              {t.disclaimer}
+            </Details>
+          </div>}
                     {t.followups && t.followups.length > 0 && (
                       <div className="mt-3 flex flex-wrap gap-1.5 border-t border-border pt-3">
                         {t.followups.map((f) => (
