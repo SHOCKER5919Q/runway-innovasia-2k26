@@ -34,9 +34,36 @@ export default function HomePage() {
   if (empty) return <EmptyWorkspace name={d.business?.name} />;
   const h = d.headline;
   const f = d.forecast;
+  const needsSetup = !d.business?.is_demo
+    && (d.data_quality?.transactions ?? 0) === 0
+    && (h.receivables?.paise ?? 0) === 0
+    && (h.payables?.paise ?? 0) === 0;
 
   return (
     <div className="space-y-7">
+      {needsSetup && (
+        <section className="card border-forest/30 bg-sage p-5 sm:p-6">
+          <div className="flex flex-wrap items-center justify-between gap-4">
+            <div className="max-w-2xl">
+              <p className="eyebrow text-forest">First-time setup</p>
+              <h2 className="mt-1 text-xl font-semibold tracking-tight">
+                Add your financial data to activate {d.business.name}
+              </h2>
+              <p className="mt-1.5 text-[13px] leading-relaxed text-ink-2">
+                Enter your current bank balance, customer invoices, supplier bills, or upload a CSV/GSTR-1/Tally export. Every forecast, risk alert, and recommendation updates from your real numbers.
+              </p>
+            </div>
+            <div className="flex flex-wrap gap-2">
+              <Link href="/app/onboarding" className="btn btn-primary h-10 px-4 text-xs">
+                Set up business data <ArrowRight className="size-3.5" />
+              </Link>
+              <Link href="/app/integrations" className="btn btn-ghost h-10 px-4 text-xs">
+                Upload CSV / PDF
+              </Link>
+            </div>
+          </div>
+        </section>
+      )}
       {/* ── overview masthead ── */}
       <Reveal>
         <section className="relative mb-1">

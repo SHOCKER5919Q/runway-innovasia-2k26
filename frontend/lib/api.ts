@@ -81,8 +81,13 @@ export const api = {
 
 export type RegisterInput = {
   email: string; password: string; full_name: string;
-  role: "owner" | "manager" | "accountant";
+  role?: "owner" | "manager" | "accountant";
   business_name?: string; join_code?: string;
+  // owner set-up details (onboarding)
+  industry?: string; city?: string; gstin?: string;
+  opening_balance_paise?: number; safety_buffer_paise?: number;
+  overdraft_limit_paise?: number; restricted_paise?: number;
+  account_name?: string; bank_name?: string;
 };
 
 /** Create an account. Owners get a business at once; managers and
@@ -92,6 +97,7 @@ export async function register(input: RegisterInput) {
     method: "POST", body: JSON.stringify(input),
   }, false);
   session.set(r.token, r.active_business_id);
+  session.setAsOf(null);
   return r;
 }
 
@@ -99,6 +105,13 @@ export async function login(email: string, password: string) {
   const r = await request<any>("/api/auth/login", {
     method: "POST", body: JSON.stringify({ email, password }),
   }, false);
-  session.set(r.token, r.active_business_id);
+  const active = r.businesses?.find((b: any) => b.id === r.active_business_id) ?? r.businesses?.[0];
+  session.set(r.token, r.active_business_id ?? "");
+  if (active?.is_demo) {
+    if (!session.asOf) session.setAsOf("2026-11-07");
+  } else {
+    session.setAsOf(null);
+  }
   return r;
 }
+

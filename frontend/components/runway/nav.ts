@@ -48,6 +48,8 @@ export const NAV: NavItem[] = [
 
   { href: "/app/copilot", label: "AI Copilot", icon: Brain, group: "Assist",
     blurb: "Talk to your business" },
+  { href: "/app/onboarding", label: "Setup Data", icon: Boxes, group: "Assist",
+    blurb: "Enter cash, invoices, bills and monthly commitments" },
   { href: "/app/integrations", label: "Integrations", icon: Plug, group: "Assist",
     blurb: "Imports and connector status" },
   { href: "/app/settings", label: "Settings", icon: Settings, group: "Assist",

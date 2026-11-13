@@ -101,6 +101,9 @@ function Nav() {
                 className="hidden px-4 py-2 text-[15px] font-semibold text-ink-2 hover:text-ink sm:block">
             Sign in
           </Link>
+          <Link href="/login?mode=register" className="btn btn-ghost btn-sm hidden sm:inline-flex">
+            Create account
+          </Link>
           <Link href="/login" className="btn btn-primary btn-sm hidden sm:inline-flex">
             Try the demo
           </Link>
@@ -121,7 +124,7 @@ function Nav() {
             </a>
           ))}
           <div className="mt-5 flex gap-3">
-            <Link href="/login" onClick={() => setOpen(false)} className="btn btn-ghost flex-1">Sign in</Link>
+            <Link href="/login?mode=register" onClick={() => setOpen(false)} className="btn btn-ghost flex-1">Create account</Link>
             <Link href="/login" onClick={() => setOpen(false)} className="btn btn-primary flex-1">Try the demo</Link>
           </div>
         </nav>
@@ -163,14 +166,14 @@ function Hero() {
           before you make it.
         </motion.p>
         <div className="rise rise-3 mt-9 flex flex-col items-center justify-center gap-3 sm:flex-row">
-          <Link href="/login" className="btn btn-primary h-[52px] px-7 text-[15px]">
-            Open the live demo <ArrowRight className="size-4" />
+          <Link href="/login?mode=register" className="btn btn-primary h-[52px] px-7 text-[15px]">
+            Use your own data <ArrowRight className="size-4" />
           </Link>
-          <a href="#product" className="btn btn-ghost h-[52px] px-7 text-[15px]">
-            See how it works
-          </a>
+          <Link href="/login" className="btn btn-ghost h-[52px] px-7 text-[15px]">
+            Open the live demo
+          </Link>
         </div>
-        <p className="mt-4 text-sm text-ink-3">No sign-up. The demo logs you in with a sample business.</p>
+        <p className="mt-4 text-sm text-ink-3">Create a free workspace for your business, or explore the seeded demo with no sign-up.</p>
 
         <Reveal delay={.15} y={24}>
           <div className="mt-16 text-left sm:mt-20">

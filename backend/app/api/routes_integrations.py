@@ -166,6 +166,14 @@ def sample_file(adapter: str):
                       '<PARTYLEDGERNAME>ABC Distributors</PARTYLEDGERNAME>'
                       '<NARRATION>Against INV-1807</NARRATION><AMOUNT>132346.00</AMOUNT>'
                       '</VOUCHER></TALLYMESSAGE></BODY></ENVELOPE>'),
+        "invoices_csv": ("invoices-bills-template.csv",
+                         "type,invoice_no,party,issue_date,due_date,total,tax,paid,settled_date,msme_class\n"
+                         "sales,INV-1001,Bharat Heavy Components,2026-09-01,2026-10-01,285000,43475,285000,2026-10-14,\n"
+                         "sales,INV-1002,Bharat Heavy Components,2026-10-05,2026-11-04,340000,51864,0,,\n"
+                         "sales,INV-1003,Deccan Auto Parts,2026-10-15,2026-11-14,195000,29746,0,,\n"
+                         "sales,INV-1004,Southern Precision Tools,2026-10-20,2026-11-19,210000,32034,0,,\n"
+                         "purchase,BILL-501,Kaveri Steel Mills,2026-10-01,2026-10-31,148000,22576,0,,micro\n"
+                         "purchase,BILL-502,Narmada Packaging,2026-10-25,2026-11-24,72000,10983,0,,small\n"),
     }
     if adapter == "pdf_invoice":
         # A PDF cannot be handed over as pasteable text, so explain how to

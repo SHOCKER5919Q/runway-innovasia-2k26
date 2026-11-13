@@ -10,9 +10,15 @@ from sqlalchemy import func, or_, select
 
 from app.api.common import jsonable, money, today_param
 from app.api.deps import DbDep, Tenant, audit, resolved_as_of
-from app.core.enums import Direction, Evidence, InvoiceKind, InvoiceStatus, ReconStatus, Role
+from app.core.enums import (
+    AccountKind, Direction, Evidence, InvoiceKind, InvoiceStatus,
+    ObligationKind, ReconStatus, Role,
+)
 from app.digital_twin.digital_twin_service import get_bundle, invalidate
-from app.models import Allocation, Counterparty, Invoice, Transaction
+from app.models import (
+    Account, Allocation, Counterparty, Invoice, Loan, Obligation,
+    Transaction, _uid,
+)
 
 router = APIRouter(prefix="/api", tags=["ledger"])
 AsOf = Annotated[date, Depends(resolved_as_of)]
@@ -379,3 +385,333 @@ def accounts(db: DbDep, ctx: Tenant, as_of: AsOf):
     b = get_bundle(db, ctx.business_id, as_of, heavy=False)
     return jsonable({"as_of": as_of.isoformat(), "position": b.position.dict(),
                      "working_capital": b.working_capital, "flow_30d": b.flow_30d})
+
+
+class AccountIn(BaseModel):
+    name: str = Field(min_length=1, max_length=160)
+    kind: str = AccountKind.CURRENT
+    bank_name: str | None = Field(default=None, max_length=120)
+    masked_number: str | None = Field(default=None, max_length=40)
+    opening_balance_paise: int = 0
+    overdraft_limit_paise: int = Field(default=0, ge=0)
+    restricted_paise: int = Field(default=0, ge=0)
+    opening_date: date | None = None
+
+
+class AccountPatch(BaseModel):
+    name: str | None = Field(default=None, min_length=1, max_length=160)
+    bank_name: str | None = Field(default=None, max_length=120)
+    masked_number: str | None = Field(default=None, max_length=40)
+    opening_balance_paise: int | None = None
+    overdraft_limit_paise: int | None = Field(default=None, ge=0)
+    restricted_paise: int | None = Field(default=None, ge=0)
+
+
+@router.post("/accounts", status_code=201)
+def create_account(body: AccountIn, db: DbDep, ctx: Tenant, as_of: AsOf):
+    ctx.require(Role.MANAGER)
+    valid_kinds = {k.value for k in AccountKind}
+    if body.kind not in valid_kinds:
+        raise HTTPException(422, f"kind must be one of {sorted(valid_kinds)}")
+    acc = Account(
+        id=_uid(), business_id=ctx.business_id,
+        name=body.name.strip(), kind=body.kind,
+        bank_name=body.bank_name.strip() if body.bank_name else None,
+        masked_number=body.masked_number.strip() if body.masked_number else None,
+        opening_balance_paise=body.opening_balance_paise,
+        overdraft_limit_paise=body.overdraft_limit_paise,
+        restricted_paise=body.restricted_paise,
+        opening_date=body.opening_date or (as_of - timedelta(days=365)),
+        source_system="manual",
+    )
+    db.add(acc)
+    audit(db, ctx, "account.create", entity="account", entity_id=acc.id,
+          detail={"name": acc.name, "opening_balance_paise": acc.opening_balance_paise})
+    db.commit()
+    invalidate(ctx.business_id)
+    return jsonable({"id": acc.id, "name": acc.name, "kind": acc.kind,
+                     "opening_balance": money(acc.opening_balance_paise),
+                     "overdraft_limit": money(acc.overdraft_limit_paise),
+                     "restricted": money(acc.restricted_paise)})
+
+
+@router.patch("/accounts/{account_id}")
+def patch_account(account_id: str, body: AccountPatch, db: DbDep, ctx: Tenant):
+    ctx.require(Role.MANAGER)
+    acc = db.get(Account, account_id)
+    if not acc or acc.business_id != ctx.business_id:
+        raise HTTPException(404, "Account not found")
+    changed = {}
+    for field, value in body.model_dump(exclude_none=True).items():
+        if isinstance(value, str):
+            value = value.strip()
+        setattr(acc, field, value)
+        changed[field] = value
+    audit(db, ctx, "account.update", entity="account", entity_id=acc.id, detail=changed)
+    db.commit()
+    invalidate(ctx.business_id)
+    return jsonable({"id": acc.id, "name": acc.name, "kind": acc.kind,
+                     "opening_balance": money(acc.opening_balance_paise),
+                     "overdraft_limit": money(acc.overdraft_limit_paise),
+                     "restricted": money(acc.restricted_paise)})
+
+
+class InvoiceIn(BaseModel):
+    kind: str = InvoiceKind.SALES
+    counterparty_name: str = Field(min_length=1, max_length=200)
+    invoice_no: str = Field(min_length=1, max_length=60)
+    issue_date: date
+    due_date: date | None = None
+    credit_days: int = Field(default=30, ge=0, le=365)
+    total_paise: int = Field(gt=0)
+    tax_paise: int | None = Field(default=None, ge=0)
+    settled_paise: int = Field(default=0, ge=0)
+    settled_date: date | None = None
+    msme_class: str | None = None
+    gstin: str | None = Field(default=None, max_length=15)
+    has_written_agreement: bool = True
+    notes: str | None = None
+
+
+@router.post("/invoices", status_code=201)
+def create_invoice(body: InvoiceIn, db: DbDep, ctx: Tenant, as_of: AsOf):
+    from app.ledger.normalise import party_key
+    from app.ledger.reconciliation import refresh_overdue
+    ctx.require(Role.MANAGER)
+    if body.kind not in (InvoiceKind.SALES, InvoiceKind.PURCHASE):
+        raise HTTPException(422, "kind must be 'sales' or 'purchase'")
+    if body.msme_class and body.msme_class not in ("micro", "small", "medium", "none"):
+        raise HTTPException(422, "msme_class must be micro, small, medium or none")
+    inv_no = body.invoice_no.strip()
+    dup = db.scalar(select(Invoice).where(
+        Invoice.business_id == ctx.business_id,
+        Invoice.kind == body.kind,
+        Invoice.invoice_no == inv_no,
+    ))
+    if dup:
+        raise HTTPException(409, f"{body.kind} invoice '{inv_no}' already exists")
+
+    name = body.counterparty_name.strip()
+    key = party_key(name)
+    cp = db.scalar(select(Counterparty).where(
+        Counterparty.business_id == ctx.business_id,
+        Counterparty.normalised_name == key,
+    ))
+    if cp is None:
+        cp = Counterparty(
+            id=_uid(), business_id=ctx.business_id, name=name, normalised_name=key,
+            party_type="customer" if body.kind == InvoiceKind.SALES else "supplier",
+            gstin=body.gstin.strip().upper() if body.gstin else None,
+            msme_class=body.msme_class,
+            credit_days=body.credit_days,
+        )
+        db.add(cp)
+        db.flush()
+    else:
+        if body.msme_class and not cp.msme_class:
+            cp.msme_class = body.msme_class
+        if body.gstin and not cp.gstin:
+            cp.gstin = body.gstin.strip().upper()
+
+    due = body.due_date or (body.issue_date + timedelta(days=body.credit_days))
+    credit_days = max(0, (due - body.issue_date).days)
+    if body.tax_paise is not None:
+        tax = min(body.total_paise, body.tax_paise)
+        taxable = body.total_paise - tax
+    else:
+        taxable = round(body.total_paise / 1.18)
+        tax = body.total_paise - taxable
+    settled = min(body.total_paise, body.settled_paise)
+    settled_date = body.settled_date
+    if settled >= body.total_paise:
+        status = InvoiceStatus.PAID
+        settled_date = settled_date or due
+    elif settled > 0:
+        status = InvoiceStatus.PART_PAID
+    else:
+        status = InvoiceStatus.OVERDUE if due < as_of else InvoiceStatus.OPEN
+
+    inv = Invoice(
+        id=_uid(), business_id=ctx.business_id, counterparty_id=cp.id,
+        kind=body.kind, invoice_no=inv_no, issue_date=body.issue_date, due_date=due,
+        credit_days=credit_days, taxable_paise=taxable, tax_paise=tax,
+        total_paise=body.total_paise, settled_paise=settled, written_off_paise=0,
+        status=status, settled_date=settled_date,
+        has_written_agreement=body.has_written_agreement,
+        source_system="manual", evidence=Evidence.OWNER_ESTIMATE, notes=body.notes,
+    )
+    db.add(inv)
+    db.flush()
+    refresh_overdue(db, ctx.business_id, as_of)
+    audit(db, ctx, "invoice.create", entity="invoice", entity_id=inv.id,
+          detail={"kind": inv.kind, "invoice_no": inv.invoice_no, "total_paise": inv.total_paise})
+    db.commit()
+    invalidate(ctx.business_id)
+    return jsonable({"id": inv.id, "invoice_no": inv.invoice_no, "kind": inv.kind,
+                     "counterparty": cp.name, "status": inv.status,
+                     "total": money(inv.total_paise), "outstanding": money(inv.outstanding_paise)})
+
+
+class ObligationIn(BaseModel):
+    kind: str = ObligationKind.OTHER
+    label: str = Field(min_length=1, max_length=200)
+    due_date: date
+    amount_paise: int = Field(gt=0)
+    is_recurring: bool = False
+    recurrence: str | None = "monthly"
+    reserve_cash: bool = True
+
+
+@router.post("/obligations", status_code=201)
+def create_obligation(body: ObligationIn, db: DbDep, ctx: Tenant):
+    ctx.require(Role.MANAGER)
+    valid_kinds = {k.value for k in ObligationKind}
+    if body.kind not in valid_kinds:
+        raise HTTPException(422, f"kind must be one of {sorted(valid_kinds)}")
+    ob = Obligation(
+        id=_uid(), business_id=ctx.business_id, kind=body.kind,
+        label=body.label.strip(), due_date=body.due_date,
+        amount_paise=body.amount_paise, evidence=Evidence.OWNER_ESTIMATE,
+        is_recurring=body.is_recurring,
+        recurrence=body.recurrence if body.is_recurring else None,
+        reserve_cash=body.reserve_cash, source_system="manual",
+    )
+    db.add(ob)
+    audit(db, ctx, "obligation.create", entity="obligation", entity_id=ob.id,
+          detail={"kind": ob.kind, "label": ob.label, "amount_paise": ob.amount_paise})
+    db.commit()
+    invalidate(ctx.business_id)
+    return jsonable({"id": ob.id, "kind": ob.kind, "label": ob.label,
+                     "due_date": ob.due_date.isoformat(), "amount": money(ob.amount_paise),
+                     "is_recurring": ob.is_recurring, "reserve_cash": ob.reserve_cash})
+
+
+class LoanIn(BaseModel):
+    lender: str = Field(min_length=1, max_length=160)
+    kind: str = "term"
+    principal_paise: int = Field(gt=0)
+    outstanding_paise: int | None = Field(default=None, ge=0)
+    annual_rate: float = Field(default=0.14, ge=0, le=1)
+    emi_paise: int = Field(gt=0)
+    emi_day: int = Field(default=5, ge=1, le=28)
+
+
+@router.post("/loans", status_code=201)
+def create_loan(body: LoanIn, db: DbDep, ctx: Tenant):
+    ctx.require(Role.MANAGER)
+    ln = Loan(
+        id=_uid(), business_id=ctx.business_id, lender=body.lender.strip(),
+        kind=body.kind, principal_paise=body.principal_paise,
+        outstanding_paise=body.outstanding_paise if body.outstanding_paise is not None else body.principal_paise,
+        annual_rate=body.annual_rate, emi_paise=body.emi_paise, emi_day=body.emi_day,
+        is_active=True,
+    )
+    db.add(ln)
+    audit(db, ctx, "loan.create", entity="loan", entity_id=ln.id,
+          detail={"lender": ln.lender, "emi_paise": ln.emi_paise})
+    db.commit()
+    invalidate(ctx.business_id)
+    return jsonable({"id": ln.id, "lender": ln.lender, "emi": money(ln.emi_paise),
+                     "outstanding": money(ln.outstanding_paise)})
+
+
+class TransactionIn(BaseModel):
+    account_id: str | None = None
+    value_date: date
+    amount_paise: int = Field(gt=0)
+    direction: str = Direction.CREDIT
+    narration: str = Field(min_length=1, max_length=500)
+    reference_no: str | None = Field(default=None, max_length=80)
+    category: str | None = None
+    counterparty_name: str | None = Field(default=None, max_length=200)
+
+
+@router.post("/transactions", status_code=201)
+def create_transaction(body: TransactionIn, db: DbDep, ctx: Tenant, as_of: AsOf):
+    from app.ledger.classifier import classify
+    from app.ledger.entities import resolve_counterparty
+    from app.ledger.normalise import fingerprint
+    from app.ledger.reconciliation import apply_match, match_transaction, refresh_overdue
+
+    ctx.require(Role.MANAGER)
+    if body.direction not in (Direction.CREDIT, Direction.DEBIT):
+        raise HTTPException(422, "direction must be 'credit' or 'debit'")
+
+    acc = None
+    if body.account_id:
+        acc = db.get(Account, body.account_id)
+        if not acc or acc.business_id != ctx.business_id:
+            raise HTTPException(404, "Account not found")
+    else:
+        acc = db.scalar(select(Account).where(
+            Account.business_id == ctx.business_id, Account.is_active.is_(True)))
+        if acc is None:
+            acc = Account(
+                id=_uid(), business_id=ctx.business_id, name="Primary Bank Account",
+                kind=AccountKind.CURRENT, opening_balance_paise=0,
+                opening_date=as_of - timedelta(days=365), source_system="manual",
+            )
+            db.add(acc)
+            db.flush()
+
+    cp_id, cp_conf, cp_why = resolve_counterparty(
+        db, ctx.business_id, f"{body.narration} {body.counterparty_name or ''}",
+        body.direction)
+    if cp_id is None and body.counterparty_name and body.counterparty_name.strip():
+        from app.ledger.normalise import party_key
+        cname = body.counterparty_name.strip()
+        ckey = party_key(cname)
+        cp = db.scalar(select(Counterparty).where(
+            Counterparty.business_id == ctx.business_id, Counterparty.normalised_name == ckey))
+        if cp is None:
+            cp = Counterparty(
+                id=_uid(), business_id=ctx.business_id, name=cname, normalised_name=ckey,
+                party_type="customer" if body.direction == Direction.CREDIT else "supplier",
+                credit_days=30,
+            )
+            db.add(cp)
+            db.flush()
+        cp_id, cp_conf, cp_why = cp.id, 1.0, "created from manual entry"
+    cp_type = None
+    if cp_id:
+        cp = db.get(Counterparty, cp_id)
+        cp_type = cp.party_type if cp else None
+
+    if body.category:
+        cat, conf, rule = body.category, 1.0, "owner"
+        evidence = Evidence.VERIFIED_ACTUAL
+    else:
+        cat, conf, rule = classify(body.narration, body.direction, counterparty_type=cp_type)
+        evidence = Evidence.OWNER_ESTIMATE
+
+    txn = Transaction(
+        id=_uid(), business_id=ctx.business_id, account_id=acc.id,
+        counterparty_id=cp_id, source_system="manual",
+        source_ref=body.reference_no, value_date=body.value_date,
+        posting_date=body.value_date, amount_paise=body.amount_paise,
+        direction=body.direction, narration=body.narration.strip(),
+        reference_no=body.reference_no.strip() if body.reference_no else None,
+        category=cat, category_confidence=conf, category_source=rule,
+        evidence=evidence, recon_status=ReconStatus.UNRECONCILED,
+        allocated_paise=0,
+        transform_log_json=[
+            {"step": "manual_entry", "by": ctx.user.id},
+            {"step": "resolve_counterparty", "result": cp_why, "confidence": round(cp_conf, 2)},
+            {"step": "classify", "category": cat, "confidence": conf, "rule": rule},
+        ],
+    )
+    txn.fingerprint = fingerprint(
+        business_id=ctx.business_id, account_id=acc.id, value_date=body.value_date,
+        amount_paise=body.amount_paise, direction=body.direction,
+        reference_no=txn.reference_no, narration=txn.narration,
+    )
+    db.add(txn)
+    db.flush()
+    res = match_transaction(db, txn)
+    apply_match(db, txn, res)
+    refresh_overdue(db, ctx.business_id, as_of)
+    audit(db, ctx, "transaction.create", entity="transaction", entity_id=txn.id,
+          detail={"direction": txn.direction, "amount_paise": txn.amount_paise, "category": txn.category})
+    db.commit()
+    invalidate(ctx.business_id)
+    return get_transaction(txn.id, db, ctx)

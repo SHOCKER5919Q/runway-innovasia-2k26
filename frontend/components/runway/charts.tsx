@@ -32,6 +32,10 @@ export const C = {
 
 const AXIS = { stroke: C.tick, fontSize: 11, tickLine: false, axisLine: false } as const;
 
+function finite(v: unknown, fallback = 0): number {
+  return typeof v === "number" && Number.isFinite(v) ? v : fallback;
+}
+
 /** Axis-tick money. Deliberately NOT `inr(v, {compact:true})`: that always
  *  carries two decimals and a space ("₹34.00 L"), which overflows a 64px
  *  axis gutter and wraps onto a second line. An axis needs the magnitude,
@@ -104,21 +108,35 @@ export function CashBandChart({
   height?: number;
   showBuffer?: boolean;
 }) {
-  const data = useMemo(() => series.week_starts.map((w, i) => ({
-    week: w,
-    idx: i,
-    actual: actualTo !== undefined && i <= actualTo ? series.p50[i] : null,
-    p50: series.p50[i],
-    // Recharts stacks an area by [base, range]; the band is p10 plus the
-    // distance to p90 so the fill sits exactly between the quantiles.
-    band: [series.p10[i], series.p90[i]] as [number, number],
-    p10: series.p10[i],
-    p90: series.p90[i],
-    scenario: scenario?.p50?.[i] ?? null,
-    scenarioP10: scenario?.p10?.[i] ?? null,
-  })), [series, scenario, actualTo]);
+  const data = useMemo(() => (series.week_starts ?? []).map((w, i) => {
+    const p10 = finite(series.p10?.[i]);
+    const p50 = finite(series.p50?.[i]);
+    const p90 = Math.max(p10, finite(series.p90?.[i]));
+    const scenRaw = scenario?.p50?.[i];
+    const scenP10Raw = scenario?.p10?.[i];
+    return {
+      week: w,
+      idx: i,
+      actual: actualTo !== undefined && i <= actualTo ? p50 : null,
+      p50,
+      // Recharts stacks an area by [base, range]; the band is p10 plus the
+      // distance to p90 so the fill sits exactly between the quantiles.
+      band: [p10, p90] as [number, number],
+      p10,
+      p90,
+      scenario: scenRaw !== undefined && scenRaw !== null ? finite(scenRaw) : null,
+      scenarioP10: scenP10Raw !== undefined && scenP10Raw !== null ? finite(scenP10Raw) : null,
+    };
+  }), [series, scenario, actualTo]);
 
-  const buffer = series.safety_buffer_paise ?? 0;
+  const buffer = finite(series.safety_buffer_paise);
+  if (data.length === 0) {
+    return (
+      <div className="flex items-center justify-center text-xs text-muted-foreground" style={{ height }}>
+        Not enough forecast history yet.
+      </div>
+    );
+  }
 
   return (
     <ResponsiveContainer width="100%" height={height}>
@@ -172,10 +190,18 @@ export function CashBandChart({
 
 export function FlowBars({ weeks, inflow, outflow, height = 220 }:
   { weeks: string[]; inflow: number[]; outflow: number[]; height?: number }) {
-  const data = weeks.map((w, i) => ({
-    week: w, inflow: inflow[i] ?? 0, outflow: -(outflow[i] ?? 0),
-    net: (inflow[i] ?? 0) - (outflow[i] ?? 0),
-  }));
+  const data = (weeks ?? []).map((w, i) => {
+    const inf = finite(inflow?.[i]);
+    const out = finite(outflow?.[i]);
+    return { week: w, inflow: inf, outflow: -out, net: inf - out };
+  });
+  if (data.length === 0) {
+    return (
+      <div className="flex items-center justify-center text-xs text-muted-foreground" style={{ height }}>
+        No cash movement scheduled yet.
+      </div>
+    );
+  }
   return (
     <ResponsiveContainer width="100%" height={height}>
       <ComposedChart data={data} margin={{ top: 8, right: 8, bottom: 4, left: 4 }} stackOffset="sign">
@@ -200,16 +226,21 @@ const AGE_COLORS = [C.teal, C.amber, "var(--chart-4)", C.rose, C.loss];
 
 export function AgeingBars({ buckets, height = 200 }:
   { buckets: { label: string; amount_paise: number; count: number; share: number }[]; height?: number }) {
+  const safeBuckets = (buckets ?? []).map((b) => ({
+    ...b,
+    amount_paise: Math.max(0, finite(b.amount_paise)),
+  }));
   return (
     <ResponsiveContainer width="100%" height={height}>
-      <BarChart data={buckets} margin={{ top: 8, right: 8, bottom: 4, left: 4 }}>
+      <BarChart data={safeBuckets} margin={{ top: 8, right: 8, bottom: 4, left: 4 }}>
         <CartesianGrid stroke={C.grid} strokeDasharray="3 3" vertical={false} />
         <XAxis dataKey="label" {...AXIS} />
-        <YAxis {...AXIS} tickFormatter={compactAxis} width={60} />
+        <YAxis {...AXIS} tickFormatter={compactAxis} width={60}
+               domain={[0, (max: number) => (Number.isFinite(max) && max > 0 ? max : 100)]} />
         <Tooltip content={<ChartTip valueFormat={(v: number) => inr(v)} />}
                  cursor={{ fill: "var(--surface-hover)" }} />
         <Bar dataKey="amount_paise" name="Outstanding" radius={[4, 4, 0, 0]}>
-          {buckets.map((_, i) => <Cell key={i} fill={AGE_COLORS[Math.min(i, AGE_COLORS.length - 1)]} />)}
+          {safeBuckets.map((_, i) => <Cell key={i} fill={AGE_COLORS[Math.min(i, AGE_COLORS.length - 1)]} />)}
         </Bar>
       </BarChart>
     </ResponsiveContainer>
@@ -221,12 +252,23 @@ export function AgeingBars({ buckets, height = 200 }:
 export function ConcentrationPie({ items, height = 220 }:
   { items: { name: string; volume_paise: number; share: number }[]; height?: number }) {
   const palette = [C.primary, C.azure, C.teal, C.amber, C.rose, C.slate];
+  const safeItems = (items ?? []).map((it) => ({
+    ...it,
+    volume_paise: Math.max(0, finite(it.volume_paise)),
+  }));
+  if (safeItems.length === 0 || safeItems.every((it) => it.volume_paise === 0)) {
+    return (
+      <div className="flex items-center justify-center text-xs text-muted-foreground" style={{ height }}>
+        No settled volume recorded yet.
+      </div>
+    );
+  }
   return (
     <ResponsiveContainer width="100%" height={height}>
       <PieChart>
-        <Pie data={items} dataKey="volume_paise" nameKey="name" innerRadius="56%" outerRadius="86%"
+        <Pie data={safeItems} dataKey="volume_paise" nameKey="name" innerRadius="56%" outerRadius="86%"
              paddingAngle={2} strokeWidth={0}>
-          {items.map((_, i) => <Cell key={i} fill={palette[i % palette.length]} />)}
+          {safeItems.map((_, i) => <Cell key={i} fill={palette[i % palette.length]} />)}
         </Pie>
         <Tooltip content={<ChartTip valueFormat={(v: number) => inr(v)} />} />
         <Legend verticalAlign="bottom" height={34} iconType="circle"
@@ -239,11 +281,12 @@ export function ConcentrationPie({ items, height = 220 }:
 /* ── health gauge ────────────────────────────────────────────── */
 
 export function HealthGauge({ score, size = 148 }: { score: number; size?: number }) {
-  const tone = score >= 80 ? C.gain : score >= 65 ? C.teal : score >= 50 ? C.warn : C.loss;
+  const safeScore = Math.min(100, Math.max(0, finite(score)));
+  const tone = safeScore >= 80 ? C.gain : safeScore >= 65 ? C.teal : safeScore >= 50 ? C.warn : C.loss;
   return (
     <div className="relative" style={{ width: size, height: size }}>
       <ResponsiveContainer width="100%" height="100%">
-        <RadialBarChart innerRadius="74%" outerRadius="100%" data={[{ value: score, fill: tone }]}
+        <RadialBarChart innerRadius="74%" outerRadius="100%" data={[{ value: safeScore, fill: tone }]}
                         startAngle={220} endAngle={-40}>
           <PolarAngleAxis type="number" domain={[0, 100]} tick={false} />
           <RadialBar dataKey="value" cornerRadius={8} background={{ fill: "var(--surface)" }} />
@@ -252,7 +295,7 @@ export function HealthGauge({ score, size = 148 }: { score: number; size?: numbe
       <div className="pointer-events-none absolute inset-0 grid place-items-center">
         <div className="text-center">
           <p className="font-display text-3xl font-semibold tnum" style={{ color: tone }}>
-            {score.toFixed(0)}
+            {safeScore.toFixed(0)}
           </p>
           <p className="text-[10px] uppercase tracking-wider text-muted-foreground">out of 100</p>
         </div>
@@ -265,7 +308,8 @@ export function HealthGauge({ score, size = 148 }: { score: number; size?: numbe
 
 export function Spark({ data, color = C.primary, height = 36 }:
   { data: number[]; color?: string; height?: number }) {
-  const rows = data.map((v, i) => ({ i, v }));
+  const rows = (data ?? []).map((v, i) => ({ i, v: finite(v) }));
+  if (rows.length === 0) return <div style={{ height }} />;
   return (
     <ResponsiveContainer width="100%" height={height}>
       <AreaChart data={rows} margin={{ top: 2, right: 0, bottom: 0, left: 0 }}>
@@ -286,14 +330,24 @@ export function Spark({ data, color = C.primary, height = 36 }:
 
 export function BreachBars({ weeks, probs, height = 150 }:
   { weeks: string[]; probs: number[]; height?: number }) {
-  const data = probs.map((p, i) => ({ week: weeks[i + 1] ?? weeks[i], p }));
+  const data = (probs ?? []).map((p, i) => ({
+    week: weeks?.[i + 1] ?? weeks?.[i] ?? `W${i + 1}`,
+    p: Math.max(0, finite(p)),
+  }));
+  if (data.length === 0) {
+    return (
+      <div className="flex items-center justify-center text-xs text-muted-foreground" style={{ height }}>
+        No breach probabilities available yet.
+      </div>
+    );
+  }
   return (
     <ResponsiveContainer width="100%" height={height}>
       <BarChart data={data} margin={{ top: 8, right: 8, bottom: 4, left: 4 }}>
         <CartesianGrid stroke={C.grid} strokeDasharray="3 3" vertical={false} />
         <XAxis dataKey="week" {...AXIS} tickFormatter={shortDate} minTickGap={16} />
         <YAxis {...AXIS} width={42} tickFormatter={(v: number) => `${Math.round(v * 100)}%`}
-               domain={[0, "dataMax"]} />
+               domain={[0, (max: number) => (Number.isFinite(max) && max > 0 ? max : 0.1)]} />
         <Tooltip content={<ChartTip labelFormat={(l: string) => `Week of ${shortDate(l)}`}
                                     valueFormat={(v: number) => `${(v * 100).toFixed(1)}%`} />}
                  cursor={{ fill: "var(--surface-hover)" }} />
@@ -313,6 +367,19 @@ export function RiskScatter({ points, height = 260 }: {
   points: { name: string; delay: number; exposure: number; reliability: number }[];
   height?: number;
 }) {
+  const safePoints = (points ?? []).map((p) => ({
+    name: p.name,
+    delay: finite(p.delay),
+    exposure: Math.max(0, finite(p.exposure)),
+    reliability: Math.min(100, Math.max(0, finite(p.reliability, 50))),
+  }));
+  if (safePoints.length === 0) {
+    return (
+      <div className="flex items-center justify-center text-xs text-muted-foreground" style={{ height }}>
+        No customer risk data recorded yet.
+      </div>
+    );
+  }
   return (
     <ResponsiveContainer width="100%" height={height}>
       <ScatterChart margin={{ top: 12, right: 16, bottom: 16, left: 4 }}>
@@ -339,8 +406,8 @@ export function RiskScatter({ points, height = 260 }: {
                  }} />
         <ReferenceLine x={0} stroke={C.gain} strokeDasharray="4 4"
                        label={{ value: "On terms", fill: C.gain, fontSize: 10, position: "top" }} />
-        <Scatter data={points} name="Customers">
-          {points.map((p, i) => (
+        <Scatter data={safePoints} name="Customers">
+          {safePoints.map((p, i) => (
             <Cell key={i} fill={p.delay > 20 ? C.loss : p.delay > 8 ? C.warn : C.teal} fillOpacity={0.78} />
           ))}
         </Scatter>

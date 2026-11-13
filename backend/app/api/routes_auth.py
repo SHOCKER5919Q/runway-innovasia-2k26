@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from datetime import datetime, timezone
+from datetime import date, datetime, timedelta, timezone
 
 from fastapi import APIRouter, HTTPException, Request, status
 from pydantic import BaseModel, EmailStr, Field
@@ -8,9 +8,9 @@ from sqlalchemy import select
 
 from app.api.deps import CurrentUser, DbDep, Tenant, audit
 from app.core import approvals
-from app.core.enums import MembershipStatus, Role
+from app.core.enums import AccountKind, MembershipStatus, Role
 from app.core.security import create_access_token, hash_password, rate_limiter, verify_password
-from app.models import AuditLog as AuditLog_, Business, Membership, User, _uid
+from app.models import Account, AuditLog as AuditLog_, Business, Membership, User, _uid
 
 router = APIRouter(prefix="/api/auth", tags=["auth"])
 
@@ -31,6 +31,14 @@ class RegisterIn(BaseModel):
     business_name: str | None = Field(default=None, max_length=200)
     join_code: str | None = Field(default=None, max_length=16)
     industry: str = "wholesale_distribution"
+    city: str | None = Field(default=None, max_length=80)
+    gstin: str | None = Field(default=None, max_length=15)
+    safety_buffer_paise: int = Field(default=0, ge=0)
+    opening_balance_paise: int = Field(default=0)
+    overdraft_limit_paise: int = Field(default=0, ge=0)
+    restricted_paise: int = Field(default=0, ge=0)
+    account_name: str = Field(default="Primary Bank Account", min_length=1, max_length=160)
+    bank_name: str | None = Field(default=None, max_length=120)
 
 
 def _session_payload(db, user: User) -> dict:
@@ -99,14 +107,29 @@ def register(body: RegisterIn, db: DbDep):
     db.add(user)
     db.flush()
     if role == Role.OWNER:
-        biz = Business(id=_uid(), name=body.business_name.strip(), industry=body.industry,
-                       is_demo=False, safety_buffer_paise=0)
+        biz = Business(
+            id=_uid(), name=body.business_name.strip(), industry=body.industry,
+            city=body.city.strip() if body.city else None,
+            gstin=body.gstin.strip().upper() if body.gstin else None,
+            is_demo=False, safety_buffer_paise=body.safety_buffer_paise,
+        )
         db.add(biz)
         db.flush()
         approvals.ensure_join_code(db, biz)
         db.add(Membership(id=_uid(), user_id=user.id, business_id=biz.id, role=Role.OWNER,
                           scopes_json=["read:*", "write:*"],
                           status=MembershipStatus.APPROVED, approvals_json=[]))
+        db.add(Account(
+            id=_uid(), business_id=biz.id, name=body.account_name.strip(),
+            kind=AccountKind.CURRENT, bank_name=body.bank_name.strip() if body.bank_name else None,
+            opening_balance_paise=body.opening_balance_paise,
+            # Early enough that the owner's past statements are not refused
+            # by the import date guard (rows before an account opened).
+            opening_date=date(2000, 1, 1),
+            overdraft_limit_paise=body.overdraft_limit_paise,
+            restricted_paise=body.restricted_paise,
+            source_system="manual",
+        ))
     else:
         m = Membership(id=_uid(), user_id=user.id, business_id=biz.id, role=role,
                        scopes_json=["read:*", "write:*"],

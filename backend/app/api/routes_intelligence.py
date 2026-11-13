@@ -248,9 +248,25 @@ def health(db: DbDep, ctx: Tenant, as_of: AsOf):
 def recommendations(db: DbDep, ctx: Tenant, as_of: AsOf):
     from app.api.routes_core import _rec_json
     b = get_bundle(db, ctx.business_id, as_of)
+    # The engine regenerates recommendations on every build; the owner's
+    # decision lives on the stored row. Without merging it back, pressing
+    # Accept or Dismiss saved the status but the list never showed it.
+    stored = {r.code: r for r in db.scalars(select(Recommendation).where(
+        Recommendation.business_id == ctx.business_id)).all()}
+    recs = []
+    for r in b.recommendations:
+        j = _rec_json(r)
+        row = stored.get(r.code)
+        j["status"] = row.status if row else "open"
+        j["decided_at"] = (row.updated_at.isoformat()
+                           if row is not None and row.status in ("accepted", "dismissed", "done")
+                           and getattr(row, "updated_at", None) else None)
+        recs.append(j)
+    order = {"open": 0, "accepted": 1, "done": 2, "dismissed": 3}
+    recs.sort(key=lambda j: order.get(j["status"], 0))
     return jsonable({
         "as_of": as_of.isoformat(),
-        "recommendations": [_rec_json(r) for r in b.recommendations],
+        "recommendations": recs,
         "ranking": {
             "method": "explainable linear score over five published terms",
             "terms": {"urgency": "how soon it stops mattering",

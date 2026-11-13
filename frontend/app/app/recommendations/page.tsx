@@ -77,6 +77,26 @@ export default function RecommendationsPage() {
               </div>
 
               <div className="flex shrink-0 flex-col gap-1.5">
+                {r.status && r.status !== "open" ? (
+                  <>
+                    <span className={cn("rw-chip justify-center capitalize",
+                      r.status === "accepted" ? "border-fin-gain/30 bg-fin-gain-soft text-fin-gain"
+                        : r.status === "done" ? "border-fin-gain/30 bg-fin-gain-soft text-fin-gain"
+                        : "border-border bg-surface text-muted-foreground")}>
+                      <Check className="size-3" /> {r.status === "accepted" ? "Approved - in progress" : r.status}
+                    </span>
+                    {r.status === "accepted" && (
+                      <button onClick={() => setStatus(r.code, "done")} disabled={busy === r.code}
+                              className="inline-flex items-center justify-center gap-1.5 rounded-md border border-fin-gain/30 px-2.5 py-1.5 text-[11px] text-fin-gain hover:bg-fin-gain-soft">
+                        Mark done
+                      </button>
+                    )}
+                    <button onClick={() => setStatus(r.code, "open")} disabled={busy === r.code}
+                            className="inline-flex items-center justify-center gap-1.5 rounded-md border border-border px-2.5 py-1.5 text-[11px] text-muted-foreground hover:bg-surface-hover">
+                      Undo
+                    </button>
+                  </>
+                ) : (<>
                 <button onClick={() => setStatus(r.code, "accepted")} disabled={busy === r.code}
                         className="inline-flex items-center gap-1.5 rounded-md border border-fin-gain/30 bg-fin-gain-soft px-2.5 py-1.5 text-[11px] text-fin-gain hover:opacity-85 disabled:opacity-50">
                   {busy === r.code ? <Loader2 className="size-3 animate-spin" /> : <Check className="size-3" />}
@@ -86,6 +106,7 @@ export default function RecommendationsPage() {
                         className="inline-flex items-center gap-1.5 rounded-md border border-border px-2.5 py-1.5 text-[11px] text-muted-foreground hover:bg-surface-hover disabled:opacity-50">
                   <X className="size-3" /> Dismiss
                 </button>
+                </>)}
                 <button onClick={() => setOpen(open === r.code ? null : r.code)}
                         aria-expanded={open === r.code}
                         className="inline-flex items-center gap-1 rounded-md px-2.5 py-1.5 text-[11px] text-primary hover:bg-surface-hover">
