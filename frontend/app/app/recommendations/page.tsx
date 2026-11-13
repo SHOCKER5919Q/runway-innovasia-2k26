@@ -46,12 +46,16 @@ export default function RecommendationsPage() {
           <span className="hidden text-xl text-muted-foreground sm:block">+</span>
           <div>
             <p className="text-[12px] text-muted-foreground">
-              {data.approved_plan.approved} approved action{data.approved_plan.approved === 1 ? "" : "s"}
+              {data.approved_plan.in_progress ?? data.approved_plan.approved} approved
+              {data.approved_plan.done ? ` · ${data.approved_plan.done} done` : ""}
             </p>
             <p className="mt-1 font-display text-2xl font-semibold tnum text-fin-gain">
               {data.approved_plan.expected_lift.display}
             </p>
-            <p className="text-[11px] text-muted-foreground">expected effect</p>
+            <p className="text-[11px] text-muted-foreground">
+              expected effect{data.approved_plan.done
+                ? ` (${data.approved_plan.done_lift.display} from done actions)` : ""}
+            </p>
           </div>
           <span className="hidden text-xl text-muted-foreground sm:block">=</span>
           <div>

@@ -270,15 +270,21 @@ def recommendations(db: DbDep, ctx: Tenant, as_of: AsOf):
     # What the approved actions would do, if the owner carries them out.
     # RUNWAY never moves money itself, so this is a projection (simulated),
     # not a change to the recorded books.
-    approved = [r for r in b.recommendations
-                if (stored.get(r.code) and stored[r.code].status == "accepted")]
-    lift = sum(max(0, r.expected_effect_paise or 0) for r in approved)
+    def _st(r):
+        return stored[r.code].status if stored.get(r.code) else "open"
+    approved = [r for r in b.recommendations if _st(r) == "accepted"]
+    done = [r for r in b.recommendations if _st(r) == "done"]
+    lift_a = sum(max(0, r.expected_effect_paise or 0) for r in approved)
+    lift_d = sum(max(0, r.expected_effect_paise or 0) for r in done)
+    lift = lift_a + lift_d
     avail = b.position.available_liquidity_paise
-    plan = {"approved": len(approved), "codes": [r.code for r in approved],
+    plan = {"approved": len(approved) + len(done), "in_progress": len(approved),
+            "done": len(done), "codes": [r.code for r in approved + done],
+            "in_progress_lift": money(lift_a), "done_lift": money(lift_d),
             "available_now": money(avail), "expected_lift": money(lift),
             "available_if_done": money(avail + lift),
-            "note": ("Projected - becomes actual when the money moves and the next "
-                     "bank statement is imported.")}
+            "note": ("Projected. Marked-done actions stay counted until the next bank "
+                     "statement confirms the money; then they show in recorded cash.")}
     return jsonable({
         "as_of": as_of.isoformat(),
         "approved_plan": plan,
