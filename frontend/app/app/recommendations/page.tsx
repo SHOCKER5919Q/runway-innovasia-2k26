@@ -36,6 +36,34 @@ export default function RecommendationsPage() {
         <p className="text-xs leading-relaxed text-muted-foreground text-pretty">{data.guarantee}</p>
       </div>
 
+      {data.approved_plan && (
+        <div className="rw-card grid gap-4 p-5 sm:grid-cols-[1fr_auto_1fr_auto_1fr] sm:items-center">
+          <div>
+            <p className="text-[12px] text-muted-foreground">Available cash now</p>
+            <p className="mt-1 font-display text-2xl font-semibold tnum">{data.approved_plan.available_now.display}</p>
+            <p className="text-[11px] text-muted-foreground">recorded</p>
+          </div>
+          <span className="hidden text-xl text-muted-foreground sm:block">+</span>
+          <div>
+            <p className="text-[12px] text-muted-foreground">
+              {data.approved_plan.approved} approved action{data.approved_plan.approved === 1 ? "" : "s"}
+            </p>
+            <p className="mt-1 font-display text-2xl font-semibold tnum text-fin-gain">
+              {data.approved_plan.expected_lift.display}
+            </p>
+            <p className="text-[11px] text-muted-foreground">expected effect</p>
+          </div>
+          <span className="hidden text-xl text-muted-foreground sm:block">=</span>
+          <div>
+            <p className="text-[12px] text-muted-foreground">If you complete them</p>
+            <p className="mt-1 font-display text-2xl font-semibold tnum">
+              {data.approved_plan.available_if_done.display}
+            </p>
+            <p className="text-[11px] text-muted-foreground">{data.approved_plan.note}</p>
+          </div>
+        </div>
+      )}
+
       <div className="space-y-3">
         {data.recommendations.map((r: any, idx: number) => (
           <motion.article key={r.code} className="rw-card overflow-hidden"

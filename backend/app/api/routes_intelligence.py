@@ -251,8 +251,11 @@ def recommendations(db: DbDep, ctx: Tenant, as_of: AsOf):
     # The engine regenerates recommendations on every build; the owner's
     # decision lives on the stored row. Without merging it back, pressing
     # Accept or Dismiss saved the status but the list never showed it.
-    stored = {r.code: r for r in db.scalars(select(Recommendation).where(
-        Recommendation.business_id == ctx.business_id)).all()}
+    stored = {}
+    for r in db.scalars(select(Recommendation).where(
+            Recommendation.business_id == ctx.business_id)).all():
+        if r.code not in stored or (stored[r.code].status == "open" and r.status != "open"):
+            stored[r.code] = r
     recs = []
     for r in b.recommendations:
         j = _rec_json(r)
@@ -264,8 +267,21 @@ def recommendations(db: DbDep, ctx: Tenant, as_of: AsOf):
         recs.append(j)
     order = {"open": 0, "accepted": 1, "done": 2, "dismissed": 3}
     recs.sort(key=lambda j: order.get(j["status"], 0))
+    # What the approved actions would do, if the owner carries them out.
+    # RUNWAY never moves money itself, so this is a projection (simulated),
+    # not a change to the recorded books.
+    approved = [r for r in b.recommendations
+                if (stored.get(r.code) and stored[r.code].status == "accepted")]
+    lift = sum(max(0, r.expected_effect_paise or 0) for r in approved)
+    avail = b.position.available_liquidity_paise
+    plan = {"approved": len(approved), "codes": [r.code for r in approved],
+            "available_now": money(avail), "expected_lift": money(lift),
+            "available_if_done": money(avail + lift),
+            "note": ("Projected - becomes actual when the money moves and the next "
+                     "bank statement is imported.")}
     return jsonable({
         "as_of": as_of.isoformat(),
+        "approved_plan": plan,
         "recommendations": recs,
         "ranking": {
             "method": "explainable linear score over five published terms",

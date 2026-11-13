@@ -234,9 +234,19 @@ def _persist_alerts(db, business_id: str, findings, state_id: str) -> None:
 
 def _persist_recs(db, business_id: str, recs, state_id: str) -> None:
     from app.models import Recommendation
-    existing = {r.code: r for r in db.scalars(select(Recommendation).where(
-        Recommendation.business_id == business_id,
-        Recommendation.status.in_(["open", "accepted"]))).all()}
+    # One row per recommendation code, keeping the owner's decision. This used
+    # to look only at open/accepted rows, so a dismissed or done item got a
+    # fresh "open" twin on the next build and the decision vanished.
+    existing = {}
+    for r in db.scalars(select(Recommendation).where(
+            Recommendation.business_id == business_id)).all():
+        keep = existing.get(r.code)
+        if keep is None or (keep.status == "open" and r.status != "open"):
+            if keep is not None:
+                db.delete(keep)
+            existing[r.code] = r
+        else:
+            db.delete(r)
     seen = set()
     for r in recs:
         seen.add(r.code)
