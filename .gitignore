@@ -26,3 +26,6 @@ frontend/.env.local
 
 # generated verification screenshots (regenerable, ~5MB)
 frontend/shots/
+
+# real-data raw archives (restored by download.py, verified by SHA-256)
+data/real/*/raw/

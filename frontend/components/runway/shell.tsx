@@ -8,7 +8,7 @@ import {
   Command, LogOut, Menu, MessageCircle, Moon, Search, Sun, X,
 } from "lucide-react";
 import { AnimatePresence, motion } from "motion/react";
-import { ACCOUNTANT_NAV, GROUPS, NAV, type NavItem } from "./nav";
+import { GROUPS, NAV, navForRole, type NavItem } from "./nav";
 import { Logo } from "./brand";
 import { api, session } from "@/lib/api";
 import { useApi } from "@/lib/use-api";
@@ -23,6 +23,7 @@ type Me = {
   businesses: { id: string; name: string; industry: string; role: string;
                 is_demo: boolean; demo_scenario: string | null }[];
   active_business_id: string | null;
+  pending_memberships?: any[];
 };
 
 export function AppShell({ children }: { children: React.ReactNode }) {
@@ -69,11 +70,18 @@ export function AppShell({ children }: { children: React.ReactNode }) {
     localStorage.setItem("runway.sidebar", next ? "collapsed" : "open");
   };
 
-  const items = useMemo(() => {
-    const base = [...NAV];
-    if (me.data?.user?.is_accountant) base.push(ACCOUNTANT_NAV);
-    return base;
+  // A signed-in user with no approved business is waiting for approval.
+  useEffect(() => {
+    if (me.data && !me.data.active_business_id) router.replace("/pending");
+  }, [me.data, router]);
+
+  const role = useMemo(() => {
+    const id = session.businessId ?? me.data?.active_business_id;
+    return me.data?.businesses.find((b) => b.id === id)?.role ?? me.data?.businesses[0]?.role;
   }, [me.data]);
+
+  const items = useMemo(
+    () => navForRole(role, !!me.data?.user?.is_accountant), [role, me.data]);
 
   const alerts = overview.data?.alerts_count ?? {};
   const alertCount = (alerts.critical ?? 0) + (alerts.warning ?? 0);

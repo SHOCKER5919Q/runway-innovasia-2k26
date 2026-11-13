@@ -31,6 +31,11 @@ export default function TransactionsPage() {
   const [needsReview, setNeedsReview] = useState(false);
   const [sort, setSort] = useState("date_desc");
   const [openId, setOpenId] = useState<string | null>(null);
+  // Arriving from Import history: show only the rows that upload added.
+  const [batch, setBatch] = useState<string | null>(null);
+  useEffect(() => {
+    setBatch(new URLSearchParams(window.location.search).get("import_batch_id"));
+  }, []);
 
   useEffect(() => {
     const t = setTimeout(() => { setDebounced(q); setPage(1); }, 300);
@@ -44,8 +49,9 @@ export default function TransactionsPage() {
     if (recon) p.set("recon_status", recon);
     if (direction) p.set("direction", direction);
     if (needsReview) p.set("needs_review", "true");
+    if (batch) p.set("import_batch_id", batch);
     return p.toString();
-  }, [page, debounced, category, recon, direction, needsReview, sort]);
+  }, [page, debounced, category, recon, direction, needsReview, sort, batch]);
 
   const { data, loading, error, reload } = useApi<any>(`/api/transactions?${qs}`, [qs]);
   const detail = useApi<any>(openId ? `/api/transactions/${openId}` : null, [openId]);
@@ -60,6 +66,15 @@ export default function TransactionsPage() {
         title="Transactions"
         description="The unified ledger. Every row keeps its original source record and the full chain of transformations applied to it."
         actions={<StateBadge state="actual" />} />
+      {batch && (
+        <p className="mb-3 flex items-center gap-2 text-[12.5px]">
+          <span className="pill">Showing rows from one upload</span>
+          <button className="btn btn-ghost btn-sm" onClick={() => {
+            setBatch(null); window.history.replaceState(null, "", "/app/transactions"); }}>
+            Show all
+          </button>
+        </p>
+      )}
 
       <Panel bodyClass="p-3">
         <div className="flex flex-wrap items-center gap-2">

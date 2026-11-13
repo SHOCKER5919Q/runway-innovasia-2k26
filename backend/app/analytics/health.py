@@ -20,6 +20,7 @@ from datetime import date, timedelta
 import numpy as np
 from sqlalchemy import select
 
+from app.ledger.asof import outstanding_at, was_settled_by
 from app.core.enums import Direction, InvoiceKind, TxnCategory
 from app.models import Invoice, Loan, Transaction
 
@@ -267,7 +268,7 @@ def _dso(db, business_id: str, as_of: date, days: int = 90) -> float:
         Invoice.business_id == business_id, Invoice.kind == InvoiceKind.SALES,
         Invoice.issue_date >= as_of - timedelta(days=days), Invoice.issue_date <= as_of)).all()
     billed = sum(i.total_paise for i in invs)
-    outstanding = sum(i.outstanding_paise for i in db.scalars(select(Invoice).where(
+    outstanding = sum(outstanding_at(i, as_of) for i in db.scalars(select(Invoice).where(
         Invoice.business_id == business_id, Invoice.kind == InvoiceKind.SALES,
         Invoice.issue_date <= as_of)).all())
     return round(outstanding / (billed / days), 1) if billed else 0.0
@@ -278,7 +279,7 @@ def _dpo(db, business_id: str, as_of: date, days: int = 90) -> float:
         Invoice.business_id == business_id, Invoice.kind == InvoiceKind.PURCHASE,
         Invoice.issue_date >= as_of - timedelta(days=days), Invoice.issue_date <= as_of)).all()
     billed = sum(i.total_paise for i in invs)
-    outstanding = sum(i.outstanding_paise for i in db.scalars(select(Invoice).where(
+    outstanding = sum(outstanding_at(i, as_of) for i in db.scalars(select(Invoice).where(
         Invoice.business_id == business_id, Invoice.kind == InvoiceKind.PURCHASE,
         Invoice.issue_date <= as_of)).all())
     return round(outstanding / (billed / days), 1) if billed else 0.0

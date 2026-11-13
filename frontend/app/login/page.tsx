@@ -30,8 +30,8 @@ export default function LoginPage() {
     e.preventDefault();
     setBusy(true); setError(null);
     try {
-      await login(overrideEmail ?? email, overridePw ?? password);
-      router.push("/app");
+      const r = await login(overrideEmail ?? email, overridePw ?? password);
+      router.push(r.active_business_id ? "/app" : "/pending");
     } catch (err: any) {
       setError(err?.message ?? "Sign-in failed");
       setBusy(false);
@@ -68,6 +68,12 @@ export default function LoginPage() {
               {busy ? <Loader2 className="size-4 animate-spin" /> : <>Sign in <ArrowRight className="size-4" /></>}
             </button>
           </form>
+          <p className="mt-4 text-center text-[13.5px] text-ink-2">
+            New to Runway?{" "}
+            <Link href="/signup" className="font-semibold text-forest underline-offset-4 hover:underline">
+              Create an account
+            </Link>
+          </p>
 
           {accounts.length > 0 && (
             <div className="mt-8 rounded-2xl bg-sage p-5">

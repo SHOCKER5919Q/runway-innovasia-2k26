@@ -69,6 +69,8 @@ class Business(Base, TimestampMixin):
     risk_appetite: Mapped[str] = mapped_column(String(16), default="balanced")  # conservative|balanced|aggressive
     locale: Mapped[str] = mapped_column(String(8), default="en-IN")
     settings_json: Mapped[dict] = mapped_column(JSON, default=dict)
+    # Shared by the owner so a manager or accountant can ask to join.
+    join_code: Mapped[str | None] = mapped_column(String(16), unique=True)
 
     memberships: Mapped[list["Membership"]] = relationship(back_populates="business", cascade="all, delete-orphan")
 
@@ -97,6 +99,12 @@ class Membership(Base, TimestampMixin):
     role: Mapped[str] = mapped_column(String(20), default=Role.OWNER)
     # purpose-limited scopes, e.g. ["read:ledger","read:forecast"]
     scopes_json: Mapped[list] = mapped_column(JSON, default=list)
+    # Access is granted only once every role in approvals.REQUIRED[role] has
+    # signed off. Existing rows default to approved (see the migration).
+    status: Mapped[str] = mapped_column(String(12), default="approved",
+                                        server_default="approved", index=True)
+    # [{"role": "owner", "user_id": ..., "name": ..., "at": iso, "decision": "approved"}]
+    approvals_json: Mapped[list] = mapped_column(JSON, default=list)
 
     user: Mapped[User] = relationship(back_populates="memberships")
     business: Mapped[Business] = relationship(back_populates="memberships")

@@ -10,7 +10,7 @@ from __future__ import annotations
 from datetime import date
 from typing import Any
 
-from app.copilot import llm, router, tools
+from app.copilot import llm, models, router, tools
 from app.core.money import format_inr
 from app.models import CopilotMessage, _uid
 
@@ -30,7 +30,7 @@ SUGGESTIONS = [
 
 def ask(db, bundle, question: str, *, conversation_id: str | None = None,
         language: str = "en", user_id: str | None = None,
-        use_llm: bool = True) -> dict:
+        use_llm: bool = True, model: str | None = None) -> dict:
     conv = conversation_id or _uid()
     names = [c.name for c in bundle.behaviour] + [s.name for s in bundle.supplier_profiles]
     intent = router.route(question, known_customers=names)
@@ -38,11 +38,13 @@ def ask(db, bundle, question: str, *, conversation_id: str | None = None,
     args = dict(intent.args)
     result = tools.call(intent.tool, bundle, db=db, **args)
 
+    model_id, category = models.resolve(model, intent.tool, language)
     reply, generator = (None, "deterministic")
-    if use_llm and llm.available():
+    if use_llm and llm.available() and model_id != models.BUILTIN:
         reply, generator = llm.explain(question, intent.tool, result,
                                        language=language,
-                                       business_name=bundle.business.name)
+                                       business_name=bundle.business.name,
+                                       model=model_id)
     if reply is None:
         reply = render(intent, result, bundle)
 
@@ -68,6 +70,10 @@ def ask(db, bundle, question: str, *, conversation_id: str | None = None,
         "question": question,
         "answer": reply,
         "generator": generator,
+        "model": {"requested": model or models.AUTO,
+                  "used": generator.split(":", 1)[1] if generator.startswith("llm:") else models.BUILTIN,
+                  "category": category,
+                  "category_label": models.CATEGORIES.get(category)},
         "tool": {"name": intent.tool, "args": args, "matched_phrase": intent.matched,
                  "routing_confidence": round(min(1.0, intent.score / 5.0), 2)},
         "state": result.get("state"),

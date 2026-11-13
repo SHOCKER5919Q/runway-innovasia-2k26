@@ -58,6 +58,13 @@ class Settings(BaseSettings):
     anthropic_api_key: str | None = None
     copilot_model: str = "claude-opus-5"
     copilot_max_tokens: int = 1400
+    # xkiro: an OpenAI-compatible gateway (https://api.xkiro.com/v1) that hosts
+    # free and paid models from several vendors. Set the key in backend/.env;
+    # it is never committed. When present it is preferred over the direct
+    # Anthropic path, and the user can pick the model per question.
+    xkiro_api_key: str | None = None
+    xkiro_base_url: str = "https://api.xkiro.com/v1"
+    copilot_timeout_s: float = 45.0
 
     @property
     def cors_list(self) -> list[str]:

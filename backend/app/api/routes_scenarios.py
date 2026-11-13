@@ -10,10 +10,13 @@ from sqlalchemy import select
 
 from app.api.common import jsonable, money, today_param
 from app.api.deps import DbDep, Tenant, audit
+from app.core.config import settings
 from app.core.enums import DecisionStatus, Role, ScenarioKind
 from app.digital_twin.digital_twin_service import get_bundle
 from app.digital_twin.scenario_engine import CATALOGUE, ScenarioError
-from app.financial_states.state_manager import long_horizon_check, run_scenario
+from app.financial_states.state_manager import (
+    long_horizon_check, reconcile_with_long_horizon, run_scenario,
+)
 from app.models import Scenario, ScenarioDecision, SimulatedSnapshot, _uid
 
 router = APIRouter(prefix="/api/scenarios", tags=["scenarios"])
@@ -124,13 +127,14 @@ def run_scenario_endpoint(scenario_id: str, db: DbDep, ctx: Tenant, as_of: AsOf,
     except ScenarioError as e:
         raise HTTPException(422, str(e))
     db.commit()
+    lh = long_horizon_check(db, ctx.business_id, as_of, s.kind, s.parameters_json or {})
     return jsonable({
         "scenario": {"id": s.id, "name": s.name, "kind": s.kind,
                      "parameters": s.parameters_json},
         "simulated_state_id": state.id, "state_version": state.version,
         "baseline_state_ids": {"actual": actual.id, "predicted": predicted.id},
         "baseline_is_current": actual.id == b.actual_state.id,
-        "comparison": payload["comparison"],
+        "comparison": reconcile_with_long_horizon(payload["comparison"], lh),
         "economics": payload["economics"],
         "scenario_series": payload["scenario"],
         "baseline_series": payload["baseline"],
@@ -142,8 +146,7 @@ def run_scenario_endpoint(scenario_id: str, db: DbDep, ctx: Tenant, as_of: AsOf,
             "breach_probability": snap.breach_probability,
             "expected_profit": money(snap.expected_profit_paise),
             "financing_cost": money(snap.financing_cost_paise)},
-        "long_horizon": long_horizon_check(db, ctx.business_id, as_of,
-                                           s.kind, s.parameters_json or {}),
+        "long_horizon": lh,
         "isolation_guarantee": ("Nothing was written to the ledger. A simulated payment "
                                 "is not a payment, and a simulated loan is not a liability."),
     })
@@ -152,7 +155,10 @@ def run_scenario_endpoint(scenario_id: str, db: DbDep, ctx: Tenant, as_of: AsOf,
 class QuickRunIn(BaseModel):
     kind: str
     parameters: dict = Field(default_factory=dict)
-    paths: int = Field(default=2500, ge=200, le=20000)
+    # Same path count as the dashboard forecast, so the Scenario Lab's baseline
+    # matches the runway the owner sees on the home screen (it used to run
+    # 2,500 paths and show 5.38 weeks next to the dashboard's 4.85).
+    paths: int = Field(default=settings.monte_carlo_paths, ge=200, le=20000)
 
 
 @router.post("/quick-run")
@@ -169,15 +175,15 @@ def quick_run(body: QuickRunIn, db: DbDep, ctx: Tenant, as_of: AsOf):
         raise HTTPException(422, str(e))
     base = simulate(b.forecast_inputs, paths=body.paths, seed=settings.monte_carlo_seed)
     scen = simulate(fi, paths=body.paths, seed=settings.monte_carlo_seed)
+    lh = long_horizon_check(db, ctx.business_id, as_of, body.kind, body.parameters)
     return jsonable({
         "kind": body.kind, "parameters": body.parameters,
-        "comparison": compare_simulations(base, scen, extras),
+        "comparison": reconcile_with_long_horizon(compare_simulations(base, scen, extras), lh),
         "economics": extras, "scenario_series": scen.dict(), "baseline_series": base.dict(),
         # For scenarios that change the sales run-rate, a 13-week window sees
         # the purchases before the collections they fund. The second quarter
         # is computed too rather than the bias merely being disclosed.
-        "long_horizon": long_horizon_check(db, ctx.business_id, as_of,
-                                           body.kind, body.parameters),
+        "long_horizon": lh,
         "saved": False,
         "isolation_guarantee": "Nothing was written to the ledger or saved.",
     })

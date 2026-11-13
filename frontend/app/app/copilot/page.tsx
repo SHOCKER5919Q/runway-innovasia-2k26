@@ -21,6 +21,7 @@ type Turn = {
   evidence?: { label: string; value: string }[];
   followups?: string[];
   generator?: string;
+  model?: { requested: string; used: string; category: string; category_label?: string };
   disclaimer?: string | null;
   ok?: boolean;
 };
@@ -28,6 +29,15 @@ type Turn = {
 export default function CopilotPage() {
   const suggestions = useApi<any>("/api/copilot/suggestions");
   const tools = useApi<any>("/api/copilot/tools");
+  const catalogue = useApi<any>("/api/copilot/models");
+  const [model, setModel] = useState("auto");
+  useEffect(() => {
+    try { const m = localStorage.getItem("runway.copilot.model"); if (m) setModel(m); } catch {}
+  }, []);
+  const pickModel = (m: string) => {
+    setModel(m);
+    try { localStorage.setItem("runway.copilot.model", m); } catch {}
+  };
   const [turns, setTurns] = useState<Turn[]>([]);
   const [q, setQ] = useState("");
   const [busy, setBusy] = useState(false);
@@ -46,11 +56,11 @@ export default function CopilotPage() {
     setBusy(true);
     try {
       const r = await api.post<any>("/api/copilot/ask",
-        { question, conversation_id: conv, language: lang });
+        { question, conversation_id: conv, language: lang, model });
       setConv(r.conversation_id);
       setTurns((t) => [...t, {
         role: "assistant", text: r.answer, state: r.state, tool: r.tool,
-        evidence: r.evidence, followups: r.followups, generator: r.generator,
+        evidence: r.evidence, followups: r.followups, generator: r.generator, model: r.model,
         disclaimer: r.disclaimer, ok: r.ok,
       }]);
     } catch (e: any) {
@@ -81,12 +91,23 @@ export default function CopilotPage() {
           title="Talk to your business"
           description="Ask a question in plain language. RUNWAY routes it to a financial tool, runs the calculation, and explains the result — it never does the arithmetic in prose."
           actions={
-            <select value={lang} onChange={(e) => setLang(e.target.value)} aria-label="Language"
-                    className="h-8 rounded-md border border-border bg-surface px-2 text-xs outline-none">
-              {(suggestions.data?.languages ?? [{ code: "en", label: "English" }]).map((l: any) => (
-                <option key={l.code} value={l.code}>{l.label}</option>
-              ))}
-            </select>} />
+            <div className="flex flex-wrap items-center gap-2">
+              <select value={model} onChange={(e) => pickModel(e.target.value)} aria-label="AI model"
+                      title="Which AI writes the explanation. The figures are the same for every model."
+                      className="h-8 max-w-[15rem] rounded-md border border-border bg-surface px-2 text-xs outline-none">
+                {(catalogue.data?.options ?? [{ id: "auto", label: "Auto" }]).map((o: any) => (
+                  <option key={o.id} value={o.id}>
+                    {o.label}{o.tier && o.tier !== "free" ? ` (${o.tier})` : ""}
+                  </option>
+                ))}
+              </select>
+              <select value={lang} onChange={(e) => setLang(e.target.value)} aria-label="Language"
+                      className="h-8 rounded-md border border-border bg-surface px-2 text-xs outline-none">
+                {(suggestions.data?.languages ?? [{ code: "en", label: "English" }]).map((l: any) => (
+                  <option key={l.code} value={l.code}>{l.label}</option>
+                ))}
+              </select>
+            </div>} />
 
         <div className="flex-1 space-y-4 overflow-y-auto pb-4">
           {turns.length === 0 && (
@@ -138,8 +159,12 @@ export default function CopilotPage() {
                       )}
                       {t.generator && (
                         <span className="text-[10px] uppercase tracking-wider text-muted-foreground">
-                          {t.generator.startsWith("llm") ? "model-written, figures verified"
-                                                         : "deterministic"}
+                          {t.generator.startsWith("llm")
+                            ? `${modelLabel(catalogue.data, t.model?.used)} · figures verified`
+                            : t.generator.startsWith("deterministic (")
+                            ? `built-in · ${t.generator.slice(15, -1)}`
+                            : "built-in"}
+                          {t.model?.category_label ? ` · ${t.model.category_label}` : ""}
                         </span>
                       )}
                     </div>
@@ -198,6 +223,7 @@ export default function CopilotPage() {
 
       {/* ── side panel ── */}
       <aside className="space-y-4">
+        {catalogue.data && <ModelGuide data={catalogue.data} active={model} onPick={pickModel} />}
         <Panel title="How this works" bodyClass="p-4">
           <ol className="space-y-2 text-[12px]">
             {["Your question is routed to a tool by deterministic pattern matching",
@@ -253,5 +279,60 @@ export default function CopilotPage() {
         )}
       </aside>
     </div>
+  );
+}
+
+
+function modelLabel(cat: any, id?: string) {
+  return cat?.options?.find((o: any) => o.id === id)?.label ?? id ?? "model";
+}
+
+/* Which model suits which analysis - from the measured benchmark, so a user
+   can pick knowingly. The figures never depend on the choice. */
+function ModelGuide({ data, active, onPick }: { data: any; active: string; onPick: (m: string) => void }) {
+  const opts = (data.options ?? []).filter((o: any) => o.id !== "auto");
+  return (
+    <Panel title="Choose a model" bodyClass="p-4">
+      {data.quota?.free_quota_exhausted && (
+        <p className="mb-3 rounded-md border border-fin-warn/30 bg-fin-warn-soft px-2.5 py-2 text-[11.5px] text-fin-warn">
+          Today&apos;s free AI quota is used up (resets in about{" "}
+          {Math.floor(data.quota.resets_in_minutes / 60)} h). Answers use the built-in writer
+          until then - same figures.
+        </p>
+      )}
+      <ul className="space-y-2">
+        {opts.map((o: any) => (
+          <li key={o.id}>
+            <button onClick={() => onPick(o.id)} aria-pressed={active === o.id}
+                    className={cn("w-full rounded-lg border px-3 py-2 text-left transition-colors",
+                      active === o.id ? "border-primary/40 bg-primary-soft" : "border-border hover:bg-surface-hover")}>
+              <span className="flex items-center justify-between gap-2">
+                <span className="text-[12.5px] font-semibold">{o.label}</span>
+                <span className="text-[10px] uppercase tracking-wider text-muted-foreground">
+                  {o.tier}{o.speed ? ` · ${o.speed}` : ""}
+                </span>
+              </span>
+              {o.best_for?.length > 0 && (
+                <span className="mt-1 flex flex-wrap gap-1">
+                  {o.best_for.map((c: string) => (
+                    <span key={c} className="rounded-full bg-paper-2 px-2 py-0.5 text-[10px] text-ink-2"
+                          title={data.categories?.[c]}>best for {c}</span>
+                  ))}
+                </span>
+              )}
+              <span className="mt-1 block text-[11px] leading-snug text-muted-foreground text-pretty">
+                {o.summary}
+              </span>
+              {o.bench && (
+                <span className="mt-1 block font-mono text-[10px] text-muted-foreground">
+                  verified {o.bench.verified} · {o.bench.median_s}s · reading ease {o.bench.flesch}
+                </span>
+              )}
+            </button>
+          </li>
+        ))}
+      </ul>
+      <p className="mt-3 text-[11px] leading-relaxed text-muted-foreground text-pretty">{data.guarantee}</p>
+    </Panel>
   );
 }

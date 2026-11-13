@@ -6,14 +6,16 @@ from typing import Any
 
 from sqlalchemy import select
 
-from app.core.enums import Evidence, InvoiceKind, InvoiceStatus, ReconStatus
+from app.core.enums import Direction, Evidence, InvoiceKind, InvoiceStatus, ReconStatus, TxnCategory
 from app.integrations import adapters as _adapters  # noqa: F401 (registers adapters)
 from app.integrations import pdf_invoice as _pdf_invoice  # noqa: F401
 from app.integrations.base import REGISTRY, NormalisedRow
 from app.ledger.classifier import classify
 from app.ledger.entities import resolve_counterparty
 from app.ledger.normalise import detect_duplicate, fingerprint, mark_suspected_duplicate, party_key
-from app.ledger.reconciliation import apply_match, match_transaction, refresh_overdue
+from app.ledger.reconciliation import (
+    KEYWORD_GUESSED, apply_match, match_transaction, refresh_overdue,
+)
 from app.models import Account, Counterparty, ImportBatch, Invoice, Transaction, _uid
 
 
@@ -31,7 +33,7 @@ def import_file(db, *, business_id: str, account_id: str, adapter_key: str,
     batch = ImportBatch(id=_uid(), business_id=business_id, adapter=adapter_key,
                         filename=filename, status="parsed",
                         rows_seen=report.rows_seen, rows_rejected=report.rows_rejected,
-                        errors_json=report.errors[:100])
+                        errors_json=_json_safe(report.errors[:100]))
 
     created_txn, created_inv, dup_hard, dup_soft = [], [], 0, 0
     preview: list[dict] = []
@@ -140,11 +142,19 @@ def import_file(db, *, business_id: str, account_id: str, adapter_key: str,
             apply_match(db, txn, res)
             if res.status in (ReconStatus.MATCHED, ReconStatus.PARTIALLY_MATCHED):
                 matched += 1
+                if txn.category in KEYWORD_GUESSED:
+                    # Settling a trade invoice is the stronger evidence.
+                    before = txn.category
+                    txn.category = (TxnCategory.SUPPLIER_PAYMENT
+                                    if txn.direction == Direction.DEBIT
+                                    else TxnCategory.CUSTOMER_RECEIPT)
+                    txn.category_source = f"settles a cited invoice (was {before})"
+                    txn.category_confidence = max(txn.category_confidence or 0, 0.9)
         refresh_overdue(db, business_id, today or date.today())
         db.add(batch)
         db.flush()
 
-    batch.report_json = {
+    batch.report_json = _json_safe({
         "detected_format": report.detected_format,
         "column_mapping": report.column_mapping,
         "warnings": report.warnings,
@@ -152,7 +162,7 @@ def import_file(db, *, business_id: str, account_id: str, adapter_key: str,
         "duplicates_flagged_for_review": dup_soft,
         "auto_matched_to_invoices": matched,
         "needs_review": sum(1 for p in preview if p.get("needs_review")),
-    }
+    })
     return {
         "batch_id": batch.id, "dry_run": dry_run, "adapter": adapter_key,
         "filename": filename,
@@ -213,3 +223,20 @@ def catalogue() -> dict:
                       "states exactly what it would need - credentials, a partner, or "
                       "eligibility as a regulated entity."),
     }
+
+
+def _json_safe(v):
+    """Dates and other non-JSON values in an adapter's report, as ISO strings.
+
+    The PDF extractor reports each field with its parsed value, and a
+    ``date`` in a JSON column made every committed PDF import fail with a
+    500 (dry runs passed because they roll back before serialising).
+    """
+    from datetime import date as _date, datetime as _datetime
+    if isinstance(v, dict):
+        return {k: _json_safe(x) for k, x in v.items()}
+    if isinstance(v, (list, tuple)):
+        return [_json_safe(x) for x in v]
+    if isinstance(v, (_date, _datetime)):
+        return v.isoformat()
+    return v

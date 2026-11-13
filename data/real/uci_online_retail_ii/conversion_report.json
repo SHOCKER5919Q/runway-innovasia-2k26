@@ -1,0 +1,30 @@
+{
+  "raw_rows": 1067371,
+  "exact_duplicates_removed": 34335,
+  "rows_in_window": 887037,
+  "bad_debt_adjustment_rows_dropped": 6,
+  "zero_value_rows_dropped": 4693,
+  "window": [
+    "2010-04-01",
+    "2011-12-10"
+  ],
+  "output_rows": 1107,
+  "days_with_activity": 508,
+  "first_date": "2010-04-01",
+  "last_date": "2011-12-09",
+  "total_deposits_inr": 1290105324.3,
+  "total_withdrawals_inr": 95541718.7,
+  "net_inr": 1194563605.6,
+  "total_deposits_gbp": 17588611.53,
+  "total_withdrawals_gbp": 1299104.37,
+  "invoices": {
+    "sales": 34407,
+    "cancellations": 6944
+  },
+  "inr_per_gbp": {
+    "2010-11": 70.88,
+    "2011-12": 76.39
+  },
+  "raw_sha256": "572e36277c2390fbfde10664750731e0a86f55e33470d91919085f0408e67bfb",
+  "output_sha256": "f8d89656433d761141e0fa8a383aa29419d1209e637442b0581e63deed9869f2"
+}

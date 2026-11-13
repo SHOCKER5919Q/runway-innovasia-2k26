@@ -18,9 +18,11 @@ export const session = {
   get token() { return typeof window === "undefined" ? null : localStorage.getItem(TOKEN_KEY); },
   get businessId() { return typeof window === "undefined" ? null : localStorage.getItem(BIZ_KEY); },
   get asOf() { return typeof window === "undefined" ? null : localStorage.getItem(ASOF_KEY); },
-  set(token: string, businessId: string) {
+  set(token: string, businessId: string | null) {
     localStorage.setItem(TOKEN_KEY, token);
-    localStorage.setItem(BIZ_KEY, businessId);
+    // A pending manager/accountant has no business yet; never store "null".
+    if (businessId) localStorage.setItem(BIZ_KEY, businessId);
+    else localStorage.removeItem(BIZ_KEY);
   },
   setBusiness(id: string) { localStorage.setItem(BIZ_KEY, id); },
   setAsOf(d: string | null) {
@@ -76,6 +78,22 @@ export const api = {
   upload: <T,>(p: string, form: FormData) => request<T>(p, { method: "POST", body: form }),
   raw: request,
 };
+
+export type RegisterInput = {
+  email: string; password: string; full_name: string;
+  role: "owner" | "manager" | "accountant";
+  business_name?: string; join_code?: string;
+};
+
+/** Create an account. Owners get a business at once; managers and
+ *  accountants come back pending until their approvers agree. */
+export async function register(input: RegisterInput) {
+  const r = await request<any>("/api/auth/register", {
+    method: "POST", body: JSON.stringify(input),
+  }, false);
+  session.set(r.token, r.active_business_id);
+  return r;
+}
 
 export async function login(email: string, password: string) {
   const r = await request<any>("/api/auth/login", {

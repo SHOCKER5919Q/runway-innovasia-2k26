@@ -74,19 +74,39 @@ def get_bundle(db, business_id: str, as_of: date, *, force: bool = False,
 
     fp = ledger_fingerprint(db, business_id, as_of)
     key = (business_id, as_of.isoformat(), fp, heavy)
-    if not force:
+
+    def cached():
         with _LOCK:
             hit = _CACHE.get(key)
         if hit and time.time() - hit[0] < CACHE_TTL_SECONDS:
             return hit[1]
+        return None
 
-    bundle = _build(db, business_id, as_of, heavy=heavy)
-    with _LOCK:
-        _CACHE[key] = (time.time(), bundle)
-        if len(_CACHE) > 24:
-            for k in sorted(_CACHE, key=lambda k: _CACHE[k][0])[:8]:
-                _CACHE.pop(k, None)
+    if not force and (b := cached()):
+        return b
+
+    # One build per business at a time. A page load fires several requests at
+    # once; without this each of them built the same bundle in parallel, and
+    # the concurrent state writes raced for SQLite's single write lock. Late
+    # arrivals now wait, then find the bundle the first request just cached.
+    with _build_lock(business_id):
+        if not force and (b := cached()):
+            return b
+        bundle = _build(db, business_id, as_of, heavy=heavy)
+        with _LOCK:
+            _CACHE[key] = (time.time(), bundle)
+            if len(_CACHE) > 24:
+                for k in sorted(_CACHE, key=lambda k: _CACHE[k][0])[:8]:
+                    _CACHE.pop(k, None)
     return bundle
+
+
+_BUILD_LOCKS: dict[str, threading.Lock] = {}
+
+
+def _build_lock(business_id: str) -> threading.Lock:
+    with _LOCK:
+        return _BUILD_LOCKS.setdefault(business_id, threading.Lock())
 
 
 def _build(db, business_id: str, as_of: date, *, heavy: bool) -> TwinBundle:

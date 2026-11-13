@@ -51,7 +51,7 @@ export default function ScenarioLabPage() {
 
   const run = useMutation<void, any>(async () => {
     const r = await api.post<any>("/api/scenarios/quick-run",
-      { kind: selected, parameters: values, paths: 2500 });
+      { kind: selected, parameters: values });
     setResult(r);
     return r;
   });
@@ -318,7 +318,10 @@ function ScenarioResult({ result }: { result: any }) {
                  ? "border-fin-gain/30 bg-fin-gain-soft text-fin-gain"
                  : cmp.verdict === "worsens liquidity"
                  ? "border-fin-loss/30 bg-fin-loss-soft text-fin-loss"
-                 : "border-border bg-surface text-muted-foreground")}>
+                 : cmp.verdict === "mixed"
+                 ? "border-fin-warn/30 bg-fin-warn-soft text-fin-warn"
+                 : "border-border bg-surface text-muted-foreground")}
+                   title={cmp.verdict_reason}>
                {cmp.verdict}
              </span>}
              bodyClass="p-2 pt-3">

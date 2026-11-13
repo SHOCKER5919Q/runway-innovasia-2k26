@@ -343,42 +343,148 @@ export default function IntegrationsPage() {
         </Panel>
       </div>
 
-      <Panel title="Import history">
-        {batches.data?.batches?.length ? (
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="border-b border-border text-left text-[11px] uppercase tracking-wider text-muted-foreground">
-                  <th className="pb-2 font-medium">When</th>
-                  <th className="pb-2 font-medium">Source</th>
-                  <th className="pb-2 font-medium">File</th>
-                  <th className="pb-2 text-right font-medium">Seen</th>
-                  <th className="pb-2 text-right font-medium">Imported</th>
-                  <th className="pb-2 text-right font-medium">Duplicates</th>
-                  <th className="pb-2 text-right font-medium">Matched</th>
-                </tr>
-              </thead>
-              <tbody>
-                {batches.data.batches.map((b: any) => (
-                  <tr key={b.id} className="border-b border-border/50 last:border-0">
+      <ImportHistory batches={batches.data?.batches ?? []} />
+    </div>
+  );
+}
+
+
+/* Every upload is kept - the ledger only ever grows, like a bank passbook -
+   and each one records the headline figures just before and just after it,
+   so any past upload can be opened and compared with today. */
+function ImportHistory({ batches }: { batches: any[] }) {
+  const [open, setOpen] = useState<string | null>(null);
+  const [detail, setDetail] = useState<any>(null);
+
+  async function toggle(id: string) {
+    if (open === id) { setOpen(null); return; }
+    setOpen(id); setDetail(null);
+    try { setDetail(await api.get<any>(`/api/integrations/batches/${id}?limit=50`)); }
+    catch { setDetail({ error: true }); }
+  }
+
+  const fmt = (c: any, v: any) =>
+    v === null || v === undefined ? "—"
+      : c.unit === "paise" ? inr(v, { compact: true })
+      : c.unit === "probability" ? `${(v * 100).toFixed(1)}%`
+      : c.unit === "weeks" ? `${Number(v).toFixed(2)} wk`
+      : Number(v).toLocaleString("en-IN");
+  const delta = (c: any) => {
+    if (c.change === null || c.change === undefined || c.change === 0) return "no change";
+    const sign = c.change > 0 ? "+" : "−";
+    const abs = Math.abs(c.change);
+    return sign + (c.unit === "paise" ? inr(abs, { compact: true })
+      : c.unit === "probability" ? `${(abs * 100).toFixed(1)} pts`
+      : c.unit === "weeks" ? `${abs.toFixed(2)} wk` : abs.toLocaleString("en-IN"));
+  };
+
+  return (
+    <Panel title="Import history"
+           description="Every upload stays on record. Open one to see the rows it added and what it changed.">
+      {batches.length ? (
+        <div className="overflow-x-auto">
+          <table className="w-full text-sm">
+            <thead>
+              <tr className="border-b border-border text-left text-[11px] uppercase tracking-wider text-muted-foreground">
+                <th className="pb-2 font-medium">When</th>
+                <th className="pb-2 font-medium">Source</th>
+                <th className="pb-2 font-medium">File</th>
+                <th className="pb-2 text-right font-medium">Imported</th>
+                <th className="pb-2 text-right font-medium">Duplicates</th>
+                <th className="pb-2 text-right font-medium">Cash change</th>
+                <th className="pb-2" />
+              </tr>
+            </thead>
+            <tbody>
+              {batches.map((b: any) => {
+                const cash = b.impact?.changes?.find((c: any) => c.key === "cash_in_hand_paise");
+                return [
+                  <tr key={b.id} className="border-b border-border/50">
                     <td className="py-2 tnum text-[12px]">{longDate(b.created_at.slice(0, 10))}</td>
                     <td className="py-2 text-[12px]">{b.adapter}</td>
-                    <td className="py-2 max-w-[200px] truncate text-[12px] text-muted-foreground">{b.filename}</td>
-                    <td className="py-2 text-right tnum">{b.rows_seen}</td>
+                    <td className="max-w-[220px] truncate py-2 text-[12px] text-muted-foreground">{b.filename}</td>
                     <td className="py-2 text-right tnum">{b.rows_imported}</td>
                     <td className="py-2 text-right tnum">{b.rows_duplicate}</td>
-                    <td className="py-2 text-right tnum">{b.report?.auto_matched_to_invoices ?? "—"}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        ) : (
-          <p className="py-6 text-center text-sm text-muted-foreground">
-            No imports yet. The demo workspace was generated, not imported.
-          </p>
-        )}
-      </Panel>
-    </div>
+                    <td className="py-2 text-right tnum text-[12px]">{cash ? delta(cash) : "—"}</td>
+                    <td className="py-2 text-right">
+                      <button className="btn btn-ghost btn-sm" onClick={() => toggle(b.id)}
+                              aria-expanded={open === b.id}>
+                        {open === b.id ? "Hide" : "Open"}
+                      </button>
+                    </td>
+                  </tr>,
+                  open === b.id && (
+                    <tr key={b.id + "-d"} className="border-b border-border/50 bg-paper-2/40">
+                      <td colSpan={7} className="px-3 py-4">
+                        {!detail ? <p className="text-[12px] text-muted-foreground">Loading…</p>
+                         : detail.error ? <p className="text-[12px] text-loss">Could not load this import.</p>
+                         : (
+                          <div className="grid gap-4 lg:grid-cols-2">
+                            <div>
+                              <p className="text-[12px] font-semibold">
+                                What this upload changed{detail.impact ? ` (as of ${longDate(detail.impact.as_of)})` : ""}
+                              </p>
+                              {detail.impact?.changes?.length ? (
+                                <table className="mt-2 w-full text-[12px]">
+                                  <thead><tr className="text-left text-muted-foreground">
+                                    <th className="font-medium">Figure</th>
+                                    <th className="text-right font-medium">Before</th>
+                                    <th className="text-right font-medium">After</th>
+                                    <th className="text-right font-medium">Change</th></tr></thead>
+                                  <tbody>
+                                    {detail.impact.changes.map((c: any) => (
+                                      <tr key={c.key} className="border-t border-border/40">
+                                        <td className="py-1">{c.label}</td>
+                                        <td className="py-1 text-right tnum">{fmt(c, c.before)}</td>
+                                        <td className="py-1 text-right tnum">{fmt(c, c.after)}</td>
+                                        <td className="py-1 text-right tnum">{delta(c)}</td>
+                                      </tr>
+                                    ))}
+                                  </tbody>
+                                </table>
+                              ) : (
+                                <p className="mt-2 text-[12px] text-muted-foreground">
+                                  This upload was made before impact tracking existed, or the
+                                  workspace was empty before it.
+                                </p>
+                              )}
+                            </div>
+                            <div>
+                              <p className="text-[12px] font-semibold">
+                                Rows added ({detail.transactions_total})
+                                {detail.date_range ? ` · ${detail.date_range[0]} → ${detail.date_range[1]}` : ""}
+                              </p>
+                              <ul className="mt-2 max-h-64 space-y-1 overflow-y-auto text-[12px]">
+                                {detail.transactions.map((t: any) => (
+                                  <li key={t.id} className="flex justify-between gap-3 border-t border-border/40 py-1">
+                                    <span className="tnum text-muted-foreground">{t.date}</span>
+                                    <span className="min-w-0 flex-1 truncate">{t.narration}</span>
+                                    <span className={cn("tnum", t.direction === "credit" ? "text-fin-gain" : "")}>
+                                      {t.direction === "credit" ? "+" : "−"}{t.amount.display}
+                                    </span>
+                                  </li>
+                                ))}
+                              </ul>
+                              <a href={`/app/transactions?import_batch_id=${b.id}`}
+                                 className="mt-2 inline-block text-[12px] font-semibold text-primary hover:underline">
+                                See all rows from this upload →
+                              </a>
+                            </div>
+                          </div>
+                        )}
+                      </td>
+                    </tr>
+                  ),
+                ];
+              })}
+            </tbody>
+          </table>
+        </div>
+      ) : (
+        <p className="py-6 text-center text-sm text-muted-foreground">
+          No imports yet. The demo workspace was generated, not imported.
+        </p>
+      )}
+    </Panel>
   );
 }

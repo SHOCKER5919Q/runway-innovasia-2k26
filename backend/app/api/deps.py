@@ -7,7 +7,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.core.db import get_db
-from app.core.enums import Role
+from app.core.enums import MembershipStatus, Role
 from app.core.security import decode_access_token
 from app.models import AuditLog, Business, Membership, User
 
@@ -63,11 +63,21 @@ def get_tenant(
     user: CurrentUser,
     x_business_id: Annotated[str | None, Header(alias="X-Business-Id")] = None,
 ) -> TenantContext:
-    q = select(Membership).where(Membership.user_id == user.id)
+    # Only approved memberships open a business. A pending manager or
+    # accountant gets the same 403 as a stranger: no figure of any kind is
+    # served until approvals.REQUIRED for their role is satisfied.
+    q = select(Membership).where(Membership.user_id == user.id,
+                                 Membership.status == MembershipStatus.APPROVED)
     if x_business_id:
         q = q.where(Membership.business_id == x_business_id)
     rows = db.scalars(q).all()
     if not rows:
+        waiting = db.scalar(select(Membership).where(
+            Membership.user_id == user.id, Membership.status == MembershipStatus.PENDING))
+        if waiting is not None:
+            raise HTTPException(status.HTTP_403_FORBIDDEN,
+                                "Your access is waiting for approval. You will be able to "
+                                "see this business once every required approver has agreed.")
         raise HTTPException(status.HTTP_403_FORBIDDEN,
                             "No business membership for this user" if not x_business_id
                             else "You do not have access to this business")

@@ -19,8 +19,9 @@ from __future__ import annotations
 from dataclasses import asdict, dataclass
 from datetime import date, timedelta
 
-from sqlalchemy import select
+from sqlalchemy import select, or_
 
+from app.ledger.asof import outstanding_at, was_settled_by
 from app.core.enums import InvoiceKind, InvoiceStatus
 from app.models import Counterparty, Invoice
 
@@ -82,9 +83,9 @@ def supplier_profiles(db, business_id: str, as_of: date,
         if cp is None:
             continue
         spend = sum(i.total_paise for i in rows)
-        open_rows = [i for i in rows if i.outstanding_paise > 0]
-        outstanding = sum(i.outstanding_paise for i in open_rows)
-        overdue = sum(i.outstanding_paise for i in open_rows if i.due_date < as_of)
+        open_rows = [i for i in rows if outstanding_at(i, as_of) > 0]
+        outstanding = sum(outstanding_at(i, as_of) for i in open_rows)
+        overdue = sum(outstanding_at(i, as_of) for i in open_rows if i.due_date < as_of)
         paid = [i for i in rows if i.settled_date]
         mean_pay = (sum((i.settled_date - i.issue_date).days for i in paid) / len(paid)) if paid else 0.0
 
@@ -93,7 +94,7 @@ def supplier_profiles(db, business_id: str, as_of: date,
         if cp.early_payment_discount_pct > 0 and open_rows:
             eligible = [i for i in open_rows
                         if as_of <= i.issue_date + timedelta(days=cp.early_payment_days)]
-            disc_amt = int(sum(i.outstanding_paise * cp.early_payment_discount_pct for i in eligible))
+            disc_amt = int(sum(outstanding_at(i, as_of) * cp.early_payment_discount_pct for i in eligible))
             days_saved = max(1, cp.credit_days - cp.early_payment_days)
             d = cp.early_payment_discount_pct
             # Effective annualised cost of forgoing the discount.
@@ -104,7 +105,7 @@ def supplier_profiles(db, business_id: str, as_of: date,
             dl = msmed_deadline(i, cp)
             if dl is None:
                 continue
-            exposed += i.outstanding_paise
+            exposed += outstanding_at(i, as_of)
             if dl < as_of:
                 breaches += 1
 
@@ -129,13 +130,15 @@ def payment_calendar(db, business_id: str, as_of: date, weeks: int = 13) -> list
     invs = db.scalars(select(Invoice).where(
         Invoice.business_id == business_id, Invoice.kind == InvoiceKind.PURCHASE,
         Invoice.issue_date <= as_of,
-        Invoice.status.notin_([InvoiceStatus.PAID, InvoiceStatus.CANCELLED,
-                               InvoiceStatus.WRITTEN_OFF]))).all()
+        # Open on that date - including invoices paid only afterwards, so a
+        # past as-of date is not rewritten by later payments.
+        Invoice.status.notin_([InvoiceStatus.CANCELLED, InvoiceStatus.WRITTEN_OFF]),
+        or_(Invoice.status != InvoiceStatus.PAID, Invoice.settled_date > as_of))).all()
     parties = {c.id: c for c in db.scalars(select(Counterparty).where(
         Counterparty.business_id == business_id)).all()}
     weeks_map: dict[date, dict] = {}
     for i in invs:
-        if i.outstanding_paise <= 0:
+        if outstanding_at(i, as_of) <= 0:
             continue
         cp = parties.get(i.counterparty_id)
         dl = msmed_deadline(i, cp)
@@ -146,15 +149,15 @@ def payment_calendar(db, business_id: str, as_of: date, weeks: int = 13) -> list
         wk = pay_on - timedelta(days=pay_on.weekday())
         e = weeks_map.setdefault(wk, {"week_start": wk.isoformat(), "amount_paise": 0,
                                       "count": 0, "msmed_amount_paise": 0, "items": []})
-        e["amount_paise"] += i.outstanding_paise
+        e["amount_paise"] += outstanding_at(i, as_of)
         e["count"] += 1
         if dl is not None:
-            e["msmed_amount_paise"] += i.outstanding_paise
+            e["msmed_amount_paise"] += outstanding_at(i, as_of)
         if len(e["items"]) < 12:
             e["items"].append({
                 "invoice_id": i.id, "invoice_no": i.invoice_no,
                 "supplier": cp.name if cp else "Unknown",
-                "amount_paise": i.outstanding_paise,
+                "amount_paise": outstanding_at(i, as_of),
                 "due_date": i.due_date.isoformat(),
                 "statutory_deadline": dl.isoformat() if dl else None,
                 "msme_class": cp.msme_class if cp else None,
@@ -167,26 +170,28 @@ def msmed_exposure(db, business_id: str, as_of: date) -> dict:
     invs = db.scalars(select(Invoice).where(
         Invoice.business_id == business_id, Invoice.kind == InvoiceKind.PURCHASE,
         Invoice.issue_date <= as_of,
-        Invoice.status.notin_([InvoiceStatus.PAID, InvoiceStatus.CANCELLED,
-                               InvoiceStatus.WRITTEN_OFF]))).all()
+        # Open on that date - including invoices paid only afterwards, so a
+        # past as-of date is not rewritten by later payments.
+        Invoice.status.notin_([InvoiceStatus.CANCELLED, InvoiceStatus.WRITTEN_OFF]),
+        or_(Invoice.status != InvoiceStatus.PAID, Invoice.settled_date > as_of))).all()
     parties = {c.id: c for c in db.scalars(select(Counterparty).where(
         Counterparty.business_id == business_id)).all()}
     breached, at_risk_14d, covered_total, items = 0, 0, 0, []
     for i in invs:
         cp = parties.get(i.counterparty_id)
         dl = msmed_deadline(i, cp)
-        if dl is None or i.outstanding_paise <= 0:
+        if dl is None or outstanding_at(i, as_of) <= 0:
             continue
-        covered_total += i.outstanding_paise
+        covered_total += outstanding_at(i, as_of)
         days = (dl - as_of).days
         if days < 0:
-            breached += i.outstanding_paise
+            breached += outstanding_at(i, as_of)
         elif days <= 14:
-            at_risk_14d += i.outstanding_paise
+            at_risk_14d += outstanding_at(i, as_of)
         if days <= 14:
             items.append({"invoice_id": i.id, "invoice_no": i.invoice_no,
                           "supplier": cp.name, "msme_class": cp.msme_class,
-                          "amount_paise": i.outstanding_paise,
+                          "amount_paise": outstanding_at(i, as_of),
                           "statutory_deadline": dl.isoformat(), "days_remaining": days})
     items.sort(key=lambda x: x["days_remaining"])
     return {

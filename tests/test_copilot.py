@@ -166,3 +166,30 @@ def test_tool_schema_exposes_no_business_parameter(client, owner_auth):
         props = (t["input_schema"] or {}).get("properties", {})
         assert "business_id" not in props, t["name"]
     assert len(schema["guarantees"]) >= 4
+
+
+# ── verifier regressions found by the model benchmark (2026-11-13) ──────────
+PAYLOAD = {"data": {"available": {"paise": 47722173, "display": "₹4,77,221"},
+                    "restricted": "Rs 5,00,000", "gap_paise": 123000000,
+                    "msmed": "₹3,52,791 is past the deadline"}}
+
+
+def test_verifier_keeps_round_numbers_whole():
+    # rstrip(".0") used to turn 500000 into "5" and 1230000 into "123".
+    assert llm.verify_numbers("Restricted: Rs 500000. Gap: Rs 12,30,000.", PAYLOAD)[0]
+
+
+def test_verifier_reads_rupee_symbol_in_payload():
+    # json.dumps escaped "₹" to "\\u20b9", hiding display strings.
+    assert llm.verify_numbers("₹3,52,791 is overdue.", PAYLOAD)[0]
+
+
+def test_verifier_accepts_lakh_rounding_of_a_real_figure():
+    assert llm.verify_numbers("You have about ₹4.77 lakh available.", PAYLOAD)[0]
+    assert llm.verify_numbers("The gap is Rs 12.3 L.", PAYLOAD)[0]
+
+
+def test_verifier_still_rejects_invented_figures():
+    assert not llm.verify_numbers("You have ₹4.95 lakh available.", PAYLOAD)[0]
+    assert not llm.verify_numbers("Set aside Rs 2,10,000 for GST.", PAYLOAD)[0]
+    assert not llm.verify_numbers("Total exposure Rs 8,29,221.", PAYLOAD)[0]   # a sum

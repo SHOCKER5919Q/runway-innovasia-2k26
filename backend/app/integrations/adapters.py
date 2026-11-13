@@ -49,13 +49,16 @@ def _norm(h: str) -> str:
     return re.sub(r"[^a-z0-9]", "", (h or "").lower())
 
 
+_INWARD_FILE = re.compile(r"gstr[-_ ]?2[ab]\b|gstr[-_ ]?2[ab][-_.]|\binward|purchase")
+_GSTIN = re.compile(r"\d{2}[A-Z]{5}\d{4}[A-Z][A-Z\d]Z[A-Z\d]")
+
 # Synonyms seen across Indian bank statement exports.
 COLUMNS = {
     "date": ["date", "txndate", "transactiondate", "valuedate", "vdate", "dateoftransaction"],
     "posting_date": ["postingdate", "bookingdate", "postdate"],
     "narration": ["narration", "description", "particulars", "details", "remarks",
                   "transactionremarks", "transactiondetails"],
-    "reference": ["chqrefno", "refno", "referenceno", "chequeno", "utr", "utrno",
+    "reference": ["chqrefno", "refno", "referenceno", "reference", "ref", "chequeno", "utr", "utrno",
                   "transactionid", "txnid", "referencenumber", "chqnoref"],
     "debit": ["debit", "withdrawal", "withdrawalamt", "withdrawalamount", "dr",
               "debitamount", "paymentsdebit"],
@@ -67,15 +70,69 @@ COLUMNS = {
 }
 
 
+# Exports often tag amount columns with a currency: "Withdrawal (INR)",
+# "Deposit Amt (Rs.)". A rupee tag is stripped so the column still matches;
+# a foreign-currency column is ignored, because picking "Deposit (GBP)" over
+# "Deposit (INR)" would silently import the wrong amounts.
+_RUPEE_TAGS = ("inr", "rs", "rupees")
+_FOREIGN_TAGS = ("usd", "gbp", "eur", "aed", "sgd", "jpy", "cny", "fx")
+
+
+def _variants(h: str) -> list[str]:
+    n = _norm(h)
+    for t in _FOREIGN_TAGS:
+        if n.endswith(t) and len(n) > len(t):
+            return []
+    out = [n]
+    for t in _RUPEE_TAGS:
+        if n.endswith(t) and len(n) > len(t):
+            out.append(n[: -len(t)])
+    return out
+
+
 def map_columns(headers: list[str]) -> dict[str, str]:
     out: dict[str, str] = {}
-    norm = {_norm(h): h for h in headers}
+    norm: dict[str, str] = {}
+    for h in headers:
+        for v in _variants(h):
+            norm.setdefault(v, h)
     for field, names in COLUMNS.items():
         for n in names:
             if n in norm:
                 out[field] = norm[n]
                 break
     return out
+
+
+def xlsx_to_csv(content: bytes) -> bytes:
+    """First worksheet of an .xlsx file as CSV bytes.
+
+    Bank portals offer "Download as Excel" as often as CSV. Dates are written
+    as ISO strings and numbers without thousands separators, so the CSV
+    parser downstream reads them exactly as it reads a CSV export.
+    """
+    import datetime as _dt
+    from openpyxl import load_workbook
+
+    wb = load_workbook(io.BytesIO(content), read_only=True, data_only=True)
+    ws = wb.worksheets[0]
+    buf = io.StringIO()
+    w = csv.writer(buf, lineterminator="\n")
+    for row in ws.iter_rows(values_only=True):
+        if row is None or all(v is None for v in row):
+            continue
+        w.writerow(["" if v is None
+                    else v.date().isoformat() if isinstance(v, _dt.datetime)
+                    else v.isoformat() if isinstance(v, _dt.date)
+                    else repr(v) if isinstance(v, float) and v != int(v)
+                    else str(int(v)) if isinstance(v, float)
+                    else str(v) for v in row])
+    wb.close()
+    return buf.getvalue().encode("utf-8")
+
+
+def _is_xlsx(content: bytes, filename: str) -> bool:
+    return filename.lower().endswith((".xlsx", ".xlsm")) or content[:4] == b"PK\x03\x04"
 
 
 @register
@@ -87,11 +144,18 @@ class BankStatementCSV(Adapter):
     description = ("Imports a bank statement exported from net banking. Column names "
                    "are detected automatically across the common Indian bank formats, "
                    "and separate debit/credit columns or a single signed amount both work.")
-    requirements = ["A CSV export from your bank. No credentials are stored."]
-    accepts = [".csv", ".txt"]
+    requirements = ["A CSV or Excel (.xlsx) export from your bank. No credentials are stored."]
+    accepts = [".csv", ".txt", ".xlsx"]
 
     def parse(self, content: bytes, *, filename: str = "") -> tuple[list[NormalisedRow], ParseReport]:
         rep = ParseReport(detected_format="bank_csv")
+        if _is_xlsx(content, filename):
+            rep.detected_format = "bank_xlsx"
+            try:
+                content = xlsx_to_csv(content)
+            except Exception as e:  # corrupt or password-protected workbook
+                rep.errors.append({"row": 0, "error": f"could not read the Excel file: {e}"})
+                return [], rep
         text = content.decode("utf-8-sig", errors="replace")
         # Some bank exports carry preamble lines before the real header.
         lines = text.splitlines()
@@ -364,13 +428,20 @@ class GSTInvoiceJSON(Adapter):
                 val = (txval or 0) + tax
             if txval is None:
                 txval = val - tax
-            kind = ("purchase" if ("2b" in filename.lower() or "inward" in filename.lower()
+            # GSTR-2A/2B and "inward" registers are purchases. A plain "2b"
+            # test also matched GSTR-1 "b2b" files and booked sales as
+            # purchases.
+            kind = ("purchase" if (_INWARD_FILE.search(filename.lower())
                                    or low.get("suppliername")) else "sales")
             out.append({"__type": "invoice", "kind": kind, "invoice_no": str(no),
                         "issue_date": d, "total_paise": rupees_to_paise(val),
                         "taxable_paise": rupees_to_paise(txval),
                         "tax_paise": rupees_to_paise(tax),
-                        "counterparty": str(party), "gstin": str(party)[:15],
+                        "counterparty": str(party),
+                        # Only a real GSTIN goes in the GSTIN field; a party
+                        # name used to be truncated into it.
+                        "gstin": (str(party).upper() if _GSTIN.fullmatch(str(party).upper())
+                                  else None),
                         "source": "gst_register"})
             rep.rows_ok += 1
         rep.warnings.append("Invoice direction is inferred from the file name and the "

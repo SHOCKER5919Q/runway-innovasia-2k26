@@ -9,7 +9,14 @@ from sqlalchemy.orm import DeclarativeBase, Session, sessionmaker
 
 from app.core.config import settings
 
-connect_args = {"check_same_thread": False} if settings.is_sqlite else {}
+# SQLite allows one writer at a time. Building a twin bundle writes state rows
+# and can take several seconds on a cold start, so the driver's default 5 s
+# lock wait made concurrent first-load requests fail with "database is
+# locked". Wait up to 30 s instead (see also the per-business build lock in
+# digital_twin_service, which stops parallel builds in the first place).
+SQLITE_BUSY_TIMEOUT_S = 30
+connect_args = ({"check_same_thread": False, "timeout": SQLITE_BUSY_TIMEOUT_S}
+                if settings.is_sqlite else {})
 engine = create_engine(
     settings.database_url,
     echo=settings.sql_echo,
@@ -25,6 +32,7 @@ if settings.is_sqlite:
         cur.execute("PRAGMA foreign_keys=ON")
         cur.execute("PRAGMA journal_mode=WAL")
         cur.execute("PRAGMA synchronous=NORMAL")
+        cur.execute(f"PRAGMA busy_timeout={SQLITE_BUSY_TIMEOUT_S * 1000}")
         cur.close()
 
 SessionLocal = sessionmaker(bind=engine, autoflush=False, expire_on_commit=False, future=True)

@@ -24,7 +24,7 @@ from dataclasses import dataclass, field
 from datetime import date, timedelta
 
 import numpy as np
-from sqlalchemy import select
+from sqlalchemy import func, select
 
 from app.core.enums import Direction, InvoiceKind, InvoiceStatus, ObligationKind, TxnCategory
 from app.ledger.asof import outstanding_at, was_settled_by
@@ -104,7 +104,7 @@ def _weeks(as_of: date, n: int) -> list[date]:
 # ────────────────────────── input assembly ──────────────────────────
 
 def revenue_runrate(db, business_id: str, as_of: date, weeks: int,
-                    industry: str) -> tuple[list[int], dict]:
+                    industry: str, lookback_weeks: int = 26) -> tuple[list[int], dict]:
     """Expected weekly sales not yet invoiced.
 
     Estimator: a robust trailing weekly median over 12 weeks, de-seasonalised
@@ -113,7 +113,7 @@ def revenue_runrate(db, business_id: str, as_of: date, weeks: int,
     with ~12 usable observations, anything heavier overfits.
     """
     prof = get_profile(industry)
-    lookback = 26
+    lookback = lookback_weeks
     start = as_of - timedelta(weeks=lookback)
     invs = db.scalars(select(Invoice).where(
         Invoice.business_id == business_id, Invoice.kind == InvoiceKind.SALES,
@@ -123,8 +123,26 @@ def revenue_runrate(db, business_id: str, as_of: date, weeks: int,
         wk = i.issue_date - timedelta(days=i.issue_date.weekday())
         buckets[wk] = buckets.get(wk, 0) + i.total_paise
     keys = sorted(buckets)[:-1]            # drop the partial current week
+    source = "sales_invoices"
     if len(keys) < 4:
-        return [0] * weeks, {"method": "insufficient history", "observations": len(keys)}
+        # No invoice history - typical of a business paid at the till (retail
+        # counter, online checkout, kirana on UPI). Fall back to the customer
+        # receipts the bank actually saw. Before this fallback such a business
+        # was forecast to sell nothing at all, so its cash could only fall.
+        rcpts = db.scalars(select(Transaction).where(
+            Transaction.business_id == business_id,
+            Transaction.direction == Direction.CREDIT,
+            Transaction.category == TxnCategory.CUSTOMER_RECEIPT,
+            Transaction.value_date >= start, Transaction.value_date <= as_of)).all()
+        rb: dict[date, int] = {}
+        for t in rcpts:
+            wk = t.value_date - timedelta(days=t.value_date.weekday())
+            rb[wk] = rb.get(wk, 0) + t.amount_paise
+        rkeys = sorted(rb)[:-1]
+        if len(rkeys) < 4:
+            return [0] * weeks, {"method": "insufficient history", "source": "none",
+                                 "observations": max(len(keys), len(rkeys))}
+        buckets, keys, source = rb, rkeys, "bank_receipts"
 
     vals = np.array([buckets[k] for k in keys], dtype=float)
     seas = np.array([prof.seasonality[k.month - 1] for k in keys], dtype=float)
@@ -146,6 +164,10 @@ def revenue_runrate(db, business_id: str, as_of: date, weeks: int,
                        "trend_damped": round(damp, 3), "paise": v})
     meta = {
         "method": "robust de-seasonalised weekly median with damped 4-week trend",
+        "source": source,
+        "source_note": ("weekly sales invoices issued" if source == "sales_invoices" else
+                        "weekly customer receipts in the bank (no sales invoices on file: "
+                        "treated as cash sales, collected at the point of sale)"),
         "observations": len(keys),
         "baseline_weekly_paise": int(base),
         "raw_trend_ratio": round(float(trend), 3),
@@ -165,12 +187,19 @@ def recurring_opex(db, business_id: str, as_of: date, lookback_days: int = 180) 
         Transaction.category.in_(cats),
         Transaction.value_date >= start, Transaction.value_date <= as_of)).all()
     total = sum(t.amount_paise for t in rows)
-    weeks = max(1.0, lookback_days / 7.0)
+    # Average over the history that exists. Dividing a 2-month ledger's
+    # costs by 26 weeks understated weekly opex about three-fold and made a
+    # young business's forecast look far safer than it is.
+    first = db.scalar(select(func.min(Transaction.value_date)).where(
+        Transaction.business_id == business_id))
+    covered = min(lookback_days, (as_of - first).days + 1) if first else lookback_days
+    weeks = max(1.0, covered / 7.0)
     by_cat: dict[str, int] = {}
     for t in rows:
         by_cat[t.category] = by_cat.get(t.category, 0) + t.amount_paise
     return int(total / weeks), {
-        "lookback_days": lookback_days, "transactions": len(rows),
+        "lookback_days": lookback_days, "days_of_history_used": round(weeks * 7),
+        "transactions": len(rows),
         "weekly_paise": int(total / weeks),
         "by_category": {k: int(v / weeks) for k, v in sorted(by_cat.items(), key=lambda kv: -kv[1])},
         "method": "trailing mean of non-invoice operating debits",
@@ -305,6 +334,11 @@ def build_inputs(db, business_id: str, as_of: date, *, horizon_weeks: int = 13,
     lags = [float((i.settled_date - i.issue_date).days) for i in settled]
     lag = float(np.median(lags)) if lags else float(prof.default_customer_credit_days + 10)
     lag_sd = float(np.std(lags)) if len(lags) > 2 else 12.0
+    if rr_meta.get("source") == "bank_receipts":
+        # The run-rate was measured on money already received, so applying an
+        # invoice credit period on top would delay cash that is collected at
+        # the point of sale.
+        lag, lag_sd = 0.0, 1.0
 
     return ForecastInputs(
         as_of=as_of, horizon_weeks=horizon_weeks,

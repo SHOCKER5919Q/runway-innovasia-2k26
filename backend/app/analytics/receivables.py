@@ -10,8 +10,9 @@ import statistics
 from dataclasses import asdict, dataclass
 from datetime import date, timedelta
 
-from sqlalchemy import select
+from sqlalchemy import select, or_
 
+from app.ledger.asof import outstanding_at, was_settled_by
 from app.core.enums import InvoiceKind, InvoiceStatus
 from app.models import Counterparty, Invoice
 
@@ -50,10 +51,13 @@ class CustomerBehaviour:
         return asdict(self)
 
 
-def _delays(invoices: list[Invoice]) -> list[float]:
+def _delays(invoices: list[Invoice], as_of: date | None = None) -> list[float]:
+    """Days late for invoices settled *by* ``as_of`` (a later payment is not
+    yet known on that date, so it must not shape a past view)."""
     out = []
     for inv in invoices:
-        if inv.settled_date and inv.status == InvoiceStatus.PAID:
+        if inv.settled_date and inv.status == InvoiceStatus.PAID and (
+                as_of is None or inv.settled_date <= as_of):
             out.append(float((inv.settled_date - inv.due_date).days))
     return out
 
@@ -87,9 +91,9 @@ def customer_behaviour(db, business_id: str, as_of: date,
         cp = parties.get(cp_id)
         if cp is None:
             continue
-        settled = [i for i in rows if i.status == InvoiceStatus.PAID]
-        open_rows = [i for i in rows if i.outstanding_paise > 0]
-        delays = _delays(rows)
+        settled = [i for i in rows if was_settled_by(i, as_of)]
+        open_rows = [i for i in rows if outstanding_at(i, as_of) > 0]
+        delays = _delays(rows, as_of)
         n = len(delays)
         mean_d = statistics.fmean(delays) if n else float(0)
         med_d = statistics.median(delays) if n else 0.0
@@ -99,9 +103,9 @@ def customer_behaviour(db, business_id: str, as_of: date,
         partial = (sum(1 for i in rows if i.first_payment_date and i.settled_date
                        and i.first_payment_date != i.settled_date) / len(rows)) if rows else 0.0
 
-        outstanding = sum(i.outstanding_paise for i in open_rows)
+        outstanding = sum(outstanding_at(i, as_of) for i in open_rows)
         overdue_rows = [i for i in open_rows if i.due_date < as_of]
-        overdue = sum(i.outstanding_paise for i in overdue_rows)
+        overdue = sum(outstanding_at(i, as_of) for i in overdue_rows)
         oldest = max(((as_of - i.due_date).days for i in overdue_rows), default=0)
 
         # Days Sales Outstanding, Simple method: outstanding / avg daily billing
@@ -147,13 +151,15 @@ def ageing(db, business_id: str, as_of: date, kind: str = InvoiceKind.SALES) -> 
     invs = db.scalars(select(Invoice).where(
         Invoice.business_id == business_id, Invoice.kind == kind,
         Invoice.issue_date <= as_of,
-        Invoice.status.notin_([InvoiceStatus.PAID, InvoiceStatus.CANCELLED,
-                               InvoiceStatus.WRITTEN_OFF]))).all()
+        # Open on that date - including invoices paid only afterwards, so a
+        # past as-of date is not rewritten by later payments.
+        Invoice.status.notin_([InvoiceStatus.CANCELLED, InvoiceStatus.WRITTEN_OFF]),
+        or_(Invoice.status != InvoiceStatus.PAID, Invoice.settled_date > as_of))).all()
     buckets = [{"lo": lo, "hi": hi, "label": lbl, "amount_paise": 0, "count": 0}
                for lo, hi, lbl in AGE_BUCKETS]
     total = 0
     for inv in invs:
-        out = inv.outstanding_paise
+        out = outstanding_at(inv, as_of)
         if out <= 0:
             continue
         total += out
@@ -182,12 +188,14 @@ def collection_priority(db, business_id: str, as_of: date, predictions: dict[str
     invs = db.scalars(select(Invoice).where(
         Invoice.business_id == business_id, Invoice.kind == InvoiceKind.SALES,
         Invoice.issue_date <= as_of,
-        Invoice.status.notin_([InvoiceStatus.PAID, InvoiceStatus.CANCELLED,
-                               InvoiceStatus.WRITTEN_OFF]))).all()
+        # Open on that date - including invoices paid only afterwards, so a
+        # past as-of date is not rewritten by later payments.
+        Invoice.status.notin_([InvoiceStatus.CANCELLED, InvoiceStatus.WRITTEN_OFF]),
+        or_(Invoice.status != InvoiceStatus.PAID, Invoice.settled_date > as_of))).all()
     rows = []
-    max_out = max((i.outstanding_paise for i in invs), default=1) or 1
+    max_out = max((outstanding_at(i, as_of) for i in invs), default=1) or 1
     for inv in invs:
-        out = inv.outstanding_paise
+        out = outstanding_at(inv, as_of)
         if out <= 0:
             continue
         b = behaviour.get(inv.counterparty_id)

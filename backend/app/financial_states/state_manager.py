@@ -411,16 +411,17 @@ def compare_simulations(baseline, scenario, economics: dict | None = None) -> di
             scenario.liquidity_cvar_paise, "paise", "lower"),
     ]
     econ = economics or {}
-    improved = sum(1 for r in rows if r["direction"] == "improved")
-    worse = sum(1 for r in rows if r["direction"] == "worse")
+    for r in rows:
+        r["material"] = _material(r)
+    verdict, why = _verdict(rows)
     return {
         "rows": rows,
         "economics": econ,
         "net_cash_effect_paise": scenario.p50[-1] - baseline.p50[-1],
         "runway_delta_weeks": round(scenario.runway_weeks_p50 - baseline.runway_weeks_p50, 2),
         "breach_delta": round(scenario.breach_probability - baseline.breach_probability, 4),
-        "verdict": ("improves liquidity" if improved > worse else
-                    "worsens liquidity" if worse > improved else "broadly neutral"),
+        "verdict": verdict,
+        "verdict_reason": why,
         "method": ("Both paths simulated with the same seed and therefore the same random "
                    "draws (common random numbers), so the difference is attributable to "
                    "the decision rather than to simulation noise."),
@@ -429,6 +430,76 @@ def compare_simulations(baseline, scenario, economics: dict | None = None) -> di
         "p90_baseline": baseline.p90, "p90_scenario": scenario.p90,
         "week_starts": baseline.week_starts,
     }
+
+
+# A change smaller than these is simulation-sized, not decision-sized, and
+# must not tip the verdict. Before this, a 0.1-point move in breach
+# probability counted as much as a 20-point one.
+MATERIAL_PROBABILITY = 0.01          # one percentage point
+MATERIAL_WEEKS = 0.1
+MATERIAL_PAISE_FLOOR = 10_000_00     # Rs 10,000
+MATERIAL_PAISE_SHARE = 0.01          # or 1% of the baseline figure
+
+DOWNSIDE_METRICS = ("Probability of breaching the buffer", "Minimum cash (P10)",
+                    "Probability of negative cash", "Liquidity CVaR (95%)")
+
+
+def _material(r: dict) -> bool:
+    d = abs(r["delta"])
+    if r["unit"] == "probability":
+        return d >= MATERIAL_PROBABILITY
+    if r["unit"] == "weeks":
+        return d >= MATERIAL_WEEKS
+    return d >= max(MATERIAL_PAISE_FLOOR, MATERIAL_PAISE_SHARE * abs(r["baseline"]))
+
+
+def _verdict(rows: list[dict]) -> tuple[str, str]:
+    """Majority of *material* moves, with the downside allowed to veto.
+
+    "mixed" is reported when the typical path improves but a downside metric
+    (breach probability, P10 minimum cash, negative-cash probability, CVaR)
+    gets materially worse, or the other way round. An owner deciding on
+    liquidity needs to see that conflict, not have it averaged away.
+    """
+    mat = [r for r in rows if r["material"] and r["direction"] != "unchanged"]
+    if not mat:
+        return "broadly neutral", "No metric moved by a material amount."
+    up = [r["metric"] for r in mat if r["direction"] == "improved"]
+    down = [r["metric"] for r in mat if r["direction"] == "worse"]
+    down_side_worse = [m for m in down if m in DOWNSIDE_METRICS]
+    down_side_better = [m for m in up if m in DOWNSIDE_METRICS]
+    if up and not down:
+        return "improves liquidity", f"Every material change is an improvement ({len(up)})."
+    if down and not up:
+        return "worsens liquidity", f"Every material change is a deterioration ({len(down)})."
+    if len(up) > len(down) and down_side_worse:
+        return "mixed", ("Better on most measures, but the downside gets worse: "
+                         + ", ".join(down_side_worse) + ".")
+    if len(down) > len(up) and down_side_better:
+        return "mixed", ("Worse on most measures, but the downside improves: "
+                         + ", ".join(down_side_better) + ".")
+    if len(up) > len(down):
+        return "improves liquidity", f"{len(up)} material improvements against {len(down)}."
+    if len(down) > len(up):
+        return "worsens liquidity", f"{len(down)} material deteriorations against {len(up)}."
+    return "mixed", "Material improvements and deteriorations are evenly balanced."
+
+
+def reconcile_with_long_horizon(comparison: dict, lh: dict | None) -> dict:
+    """Stop a 13-week verdict from contradicting the 26-week check beside it.
+
+    Scenarios that cut purchases (a revenue fall, a deferral) can look better
+    over one quarter because the saving lands before the lost collections.
+    When the 26-week closing cash says the opposite, say so in the verdict.
+    """
+    if not lh or comparison.get("verdict") != "improves liquidity":
+        return comparison
+    if lh.get("closing_delta_at_26w_paise", 0) < -MATERIAL_PAISE_FLOOR:
+        comparison["verdict"] = "mixed"
+        comparison["verdict_reason"] = (
+            "Better over 13 weeks, but closing cash is lower after 26 weeks - "
+            "the cost arrives in the second quarter. Judge it on the 26-week view.")
+    return comparison
 
 
 # ─────────────────── STATE RECONCILIATION (A vs P) ───────────────────

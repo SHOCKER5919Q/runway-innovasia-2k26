@@ -1,7 +1,7 @@
 import {
   Activity, Banknote, Boxes, Brain, Building2, Calendar, CircleDollarSign,
   FileBarChart, Gauge, Home, Landmark, LayoutGrid, LineChart, Lightbulb,
-  Plug, Receipt, Settings, ShieldAlert, Sparkles, Users, Wallet, Workflow,
+  Plug, Receipt, Settings, ShieldAlert, Sparkles, UserCheck, Users, Wallet, Workflow,
 } from "lucide-react";
 
 export type NavItem = {
@@ -58,5 +58,32 @@ export const ACCOUNTANT_NAV: NavItem = {
   href: "/app/accountant", label: "Client Portfolio", icon: Building2, group: "Assist",
   blurb: "Every business you have access to",
 };
+
+export const TEAM_NAV: NavItem = {
+  href: "/app/team", label: "Team & approvals", icon: UserCheck, group: "Assist",
+  blurb: "Who can see this business, and who is waiting to",
+};
+
+/** Each role gets the screens its job needs. The server enforces access on
+ *  every request; this only keeps each interface focused.
+ *  - owner: everything, plus approving people
+ *  - manager: day-to-day operations, plus approving accountants
+ *  - accountant: the books - ledger, dues, compliance, reports - and their
+ *    client portfolio; no scenario planning or policy settings */
+const ACCOUNTANT_SCREENS = new Set([
+  "/app", "/app/forecasts", "/app/risk", "/app/receivables", "/app/payables",
+  "/app/customers", "/app/suppliers", "/app/transactions", "/app/health",
+  "/app/compliance", "/app/reports", "/app/copilot", "/app/integrations",
+]);
+
+export function navForRole(role: string | undefined, isAccountant: boolean): NavItem[] {
+  if (role === "accountant") {
+    return [...NAV.filter((n) => ACCOUNTANT_SCREENS.has(n.href)), ACCOUNTANT_NAV];
+  }
+  const items = [...NAV];
+  if (role === "owner" || role === "manager") items.push(TEAM_NAV);
+  if (isAccountant) items.push(ACCOUNTANT_NAV);
+  return items;
+}
 
 export const GROUPS = ["Today", "Look ahead", "Money", "Standing", "Assist"];

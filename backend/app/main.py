@@ -78,13 +78,13 @@ async def observability(request: Request, call_next):
 
 from app.api import (  # noqa: E402
     routes_auth, routes_copilot, routes_core, routes_integrations,
-    routes_intelligence, routes_ledger, routes_reports, routes_scenarios,
+    routes_intelligence, routes_ledger, routes_reports, routes_scenarios, routes_team,
 )
 
 for r in (routes_auth.router, routes_core.router, routes_ledger.router,
           routes_intelligence.router, routes_scenarios.router,
           routes_copilot.router, routes_integrations.router,
-          routes_reports.router, routes_reports.public_router):
+          routes_reports.router, routes_reports.public_router, routes_team.router):
     app.include_router(r)
 
 

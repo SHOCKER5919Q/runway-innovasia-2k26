@@ -25,6 +25,7 @@ def list_transactions(
     category: str | None = None, direction: str | None = None,
     recon_status: str | None = None, counterparty_id: str | None = None,
     account_id: str | None = None,
+    import_batch_id: str | None = Query(None, description="rows added by one upload"),
     date_from: str | None = None, date_to: str | None = None,
     min_paise: int | None = None, max_paise: int | None = None,
     needs_review: bool = False,
@@ -32,6 +33,8 @@ def list_transactions(
     page: int = Query(1, ge=1), page_size: int = Query(50, ge=1, le=200),
 ):
     stmt = select(Transaction).where(Transaction.business_id == ctx.business_id)
+    if import_batch_id:
+        stmt = stmt.where(Transaction.import_batch_id == import_batch_id)
     if q:
         like = f"%{q.strip()}%"
         stmt = stmt.where(or_(Transaction.narration.ilike(like),

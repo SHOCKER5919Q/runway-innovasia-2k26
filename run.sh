@@ -65,6 +65,11 @@ setup() {
   c "Done. Start everything with:  ./run.sh dev"
 }
 
+seed_real() {
+  c "Loading the real UCI Online Retail II statement (see data/real/uci_online_retail_ii/SOURCE.md)"
+  (cd "$BACKEND" && "$PY" -m app.seed.real_uci)
+}
+
 seed() {
   local scenario="${1:-B}"
   c "Seeding demo workspace (scenario $scenario, as of $DEMO_DATE)"
@@ -149,6 +154,7 @@ test_web() {
 case "${1:-dev}" in
   setup)    setup "${2:-B}" ;;
   seed)     seed "${2:-B}" ;;
+  seed-real) seed_real ;;
   api)      api ;;
   web)      web ;;
   dev)      dev ;;

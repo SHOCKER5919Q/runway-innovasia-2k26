@@ -14,6 +14,12 @@ class Role(StrEnum):
     VIEWER = "viewer"
 
 
+class MembershipStatus(StrEnum):
+    PENDING = "pending"      # signed up, waiting for the required approvals
+    APPROVED = "approved"    # may access the business
+    REJECTED = "rejected"
+
+
 class Industry(StrEnum):
     WHOLESALE = "wholesale_distribution"
     MANUFACTURING = "manufacturing"

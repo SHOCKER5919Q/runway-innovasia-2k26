@@ -58,19 +58,36 @@ def _candidate_invoices(db, txn: Transaction) -> list[Invoice]:
     return list(db.scalars(q).all())
 
 
+# Statutory, financing and internal movements: never a trade invoice.
+NEVER_SETTLES_INVOICES = {
+    TxnCategory.PAYROLL, TxnCategory.GST_PAYMENT, TxnCategory.TAX_OTHER,
+    TxnCategory.BANK_CHARGES, TxnCategory.LOAN_REPAYMENT, TxnCategory.LOAN_DISBURSAL,
+    TxnCategory.TRANSFER, TxnCategory.GATEWAY_FEE, TxnCategory.INTEREST_INCOME,
+    TxnCategory.OWNER_DRAW, TxnCategory.CAPITAL_IN, TxnCategory.PF_ESI,
+    TxnCategory.REFUND_OUT, TxnCategory.REFUND_IN,
+}
+# Categories the classifier guesses from a keyword in the payee's name. A
+# supplier called "Charminar Logistics" is classified as freight, but a payment
+# whose narration cites PUR-5364 is settling that bill and must be matched.
+KEYWORD_GUESSED = {
+    TxnCategory.FREIGHT, TxnCategory.RENT, TxnCategory.UTILITIES,
+    TxnCategory.OTHER_INCOME, TxnCategory.OTHER_EXPENSE,
+}
+
+
 def match_transaction(db, txn: Transaction) -> MatchResult:
     """Attempt to allocate one transaction against open invoices."""
     res = MatchResult()
     if txn.direction not in (Direction.CREDIT, Direction.DEBIT):
         return res
-    if txn.category in {TxnCategory.PAYROLL, TxnCategory.GST_PAYMENT, TxnCategory.TAX_OTHER,
-                        TxnCategory.BANK_CHARGES, TxnCategory.LOAN_REPAYMENT,
-                        TxnCategory.LOAN_DISBURSAL, TxnCategory.TRANSFER,
-                        TxnCategory.GATEWAY_FEE, TxnCategory.INTEREST_INCOME,
-                        TxnCategory.OWNER_DRAW, TxnCategory.CAPITAL_IN,
-                        TxnCategory.PF_ESI, TxnCategory.RENT, TxnCategory.UTILITIES,
-                        TxnCategory.FREIGHT, TxnCategory.REFUND_OUT, TxnCategory.REFUND_IN,
-                        TxnCategory.OTHER_INCOME, TxnCategory.OTHER_EXPENSE}:
+    if txn.category in NEVER_SETTLES_INVOICES:
+        res.status = ReconStatus.IGNORED
+        res.note = f"category '{txn.category}' is not invoice-settling"
+        return res
+    if txn.category in KEYWORD_GUESSED and not _extract_invoice_refs(
+            f"{txn.narration} {txn.reference_no or ''}"):
+        # A keyword guess ("logistics" -> freight) only gives way to an
+        # explicit invoice citation; without one it stays unmatched.
         res.status = ReconStatus.IGNORED
         res.note = f"category '{txn.category}' is not invoice-settling"
         return res

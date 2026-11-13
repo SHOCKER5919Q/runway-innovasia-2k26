@@ -28,6 +28,10 @@ os.environ["RUNWAY_DATABASE_URL"] = os.environ.get(
     "RUNWAY_TEST_DATABASE_URL", f"sqlite:///{_TMP / 'test.db'}")
 os.environ["RUNWAY_MONTE_CARLO_PATHS"] = "800"
 os.environ["RUNWAY_ENV"] = "test"
+# Tests never call a paid or rate-limited model, even when backend/.env holds
+# a real key: environment variables override the .env file in pydantic.
+os.environ["RUNWAY_XKIRO_API_KEY"] = ""
+os.environ["RUNWAY_ANTHROPIC_API_KEY"] = ""
 
 import pytest  # noqa: E402
 

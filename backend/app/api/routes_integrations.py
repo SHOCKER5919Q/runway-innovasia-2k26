@@ -4,14 +4,15 @@ from datetime import date
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, File, Form, HTTPException, Query, UploadFile
-from sqlalchemy import select
+from sqlalchemy import func, select
 
 from app.api.common import jsonable, money, today_param
 from app.api.deps import DbDep, Tenant, audit
 from app.core.enums import Role
 from app.digital_twin.digital_twin_service import invalidate
+from app.integrations.history import import_with_impact
 from app.integrations.service import catalogue, import_file
-from app.models import Account, ImportBatch
+from app.models import Account, ImportBatch, Transaction
 
 router = APIRouter(prefix="/api/integrations", tags=["integrations"])
 AsOf = Annotated[date, Depends(today_param)]
@@ -32,7 +33,37 @@ def batches(db: DbDep, ctx: Tenant, limit: int = Query(30, le=200)):
         "rows_seen": b.rows_seen, "rows_imported": b.rows_imported,
         "rows_duplicate": b.rows_duplicate, "rows_rejected": b.rows_rejected,
         "created_at": b.created_at.isoformat(), "report": b.report_json,
+        "impact": (b.report_json or {}).get("impact"),
         "errors": (b.errors_json or [])[:20]} for b in rows]})
+
+
+@router.get("/batches/{batch_id}")
+def batch_detail(batch_id: str, db: DbDep, ctx: Tenant,
+                 limit: int = Query(200, ge=1, le=2000)):
+    """One past upload: its report, what it changed, and the rows it added."""
+    b = db.get(ImportBatch, batch_id)
+    if not b or b.business_id != ctx.business_id:
+        raise HTTPException(404, "Import not found")
+    txns = db.scalars(select(Transaction).where(Transaction.import_batch_id == b.id)
+                      .order_by(Transaction.value_date).limit(limit)).all()
+    total = db.scalar(select(func.count()).select_from(Transaction)
+                      .where(Transaction.import_batch_id == b.id))
+    return jsonable({
+        "id": b.id, "adapter": b.adapter, "filename": b.filename, "status": b.status,
+        "created_at": b.created_at.isoformat(),
+        "rows_seen": b.rows_seen, "rows_imported": b.rows_imported,
+        "rows_duplicate": b.rows_duplicate, "rows_rejected": b.rows_rejected,
+        "errors": (b.errors_json or [])[:100],
+        "impact": (b.report_json or {}).get("impact"),
+        "date_range": [txns[0].value_date.isoformat(), txns[-1].value_date.isoformat()]
+        if txns else None,
+        "transactions_total": total,
+        "transactions": [{
+            "id": t.id, "date": t.value_date.isoformat(), "narration": t.narration,
+            "reference": t.reference_no, "direction": t.direction,
+            "amount": money(t.amount_paise), "category": t.category,
+            "recon_status": t.recon_status} for t in txns],
+    })
 
 
 @router.post("/import")
@@ -48,9 +79,17 @@ async def do_import(db: DbDep, ctx: Tenant, as_of: AsOf,
     if not content:
         raise HTTPException(422, "Empty file")
     try:
-        result = import_file(db, business_id=ctx.business_id, account_id=account_id,
-                             adapter_key=adapter, content=content,
-                             filename=file.filename or "", dry_run=dry_run, today=as_of)
+        if dry_run:
+            result = import_file(db, business_id=ctx.business_id, account_id=account_id,
+                                 adapter_key=adapter, content=content,
+                                 filename=file.filename or "", dry_run=True, today=as_of)
+        else:
+            # Records the headline figures before and after on the batch, so
+            # every past upload keeps a record of what it changed.
+            result = import_with_impact(db, import_file, business_id=ctx.business_id,
+                                        as_of=as_of, account_id=account_id,
+                                        adapter_key=adapter, content=content,
+                                        filename=file.filename or "", dry_run=False)
     except ValueError as e:
         raise HTTPException(422, str(e))
     if not dry_run:

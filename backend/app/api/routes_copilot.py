@@ -23,6 +23,8 @@ class AskIn(BaseModel):
     conversation_id: str | None = None
     language: str = "en"
     use_llm: bool = True
+    # "auto" (default), "builtin", or a catalogue id from GET /api/copilot/models
+    model: str | None = None
 
 
 @router.post("/ask")
@@ -33,7 +35,14 @@ def copilot_ask(body: AskIn, db: DbDep, ctx: Tenant, as_of: AsOf):
     b = get_bundle(db, ctx.business_id, as_of)
     return jsonable(ask(db, b, body.question, conversation_id=body.conversation_id,
                         language=body.language, user_id=ctx.user.id,
-                        use_llm=body.use_llm))
+                        use_llm=body.use_llm, model=body.model))
+
+
+@router.get("/models")
+def model_catalogue():
+    """Which model is best for which analysis, with the benchmark behind it."""
+    from app.copilot import models
+    return models.catalogue(llm.available())
 
 
 @router.get("/history")
@@ -70,7 +79,7 @@ def suggestions(db: DbDep, ctx: Tenant, as_of: AsOf):
                           {"code": "mr", "label": "मराठी"}],
             "llm_available": llm.available(),
             "generator_note": (
-                "An Anthropic API key is configured, so answers are written by the model "
+                "A language-model key is configured, so answers are written by the model "
                 "from deterministic tool output and every rupee figure is verified "
                 "against that output before display."
                 if llm.available() else

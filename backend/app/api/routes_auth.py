@@ -7,9 +7,10 @@ from pydantic import BaseModel, EmailStr, Field
 from sqlalchemy import select
 
 from app.api.deps import CurrentUser, DbDep, Tenant, audit
-from app.core.enums import Role
+from app.core import approvals
+from app.core.enums import MembershipStatus, Role
 from app.core.security import create_access_token, hash_password, rate_limiter, verify_password
-from app.models import Business, Membership, User, _uid
+from app.models import AuditLog as AuditLog_, Business, Membership, User, _uid
 
 router = APIRouter(prefix="/api/auth", tags=["auth"])
 
@@ -23,20 +24,34 @@ class RegisterIn(BaseModel):
     email: EmailStr
     password: str = Field(min_length=8, max_length=200)
     full_name: str = Field(min_length=1, max_length=160)
+    # owner: creates a new business (business_name required).
+    # manager / accountant: asks to join one with the owner's join code and
+    # stays pending until approvals.REQUIRED[role] have all approved.
+    role: str = Role.OWNER
     business_name: str | None = Field(default=None, max_length=200)
+    join_code: str | None = Field(default=None, max_length=16)
     industry: str = "wholesale_distribution"
 
 
 def _session_payload(db, user: User) -> dict:
     memberships = db.scalars(select(Membership).where(Membership.user_id == user.id)).all()
-    businesses = []
+    businesses, pending = [], []
     for m in memberships:
         b = db.get(Business, m.business_id)
-        if b:
+        if not b:
+            continue
+        if m.status == MembershipStatus.APPROVED:
             businesses.append({"id": b.id, "name": b.name, "industry": b.industry,
                                "role": m.role, "is_demo": b.is_demo,
                                "demo_scenario": b.demo_scenario, "city": b.city})
+        else:
+            # Name and status only - no figures leave the business before approval.
+            pending.append({"business_name": b.name, "role": m.role, "status": m.status,
+                            "waiting_for": approvals.outstanding(db, m)
+                            if m.status == MembershipStatus.PENDING else [],
+                            "approvals": m.approvals_json or []})
     return {
+        "pending_memberships": pending,
         "token": create_access_token(user_id=user.id, email=user.email),
         "user": {"id": user.id, "email": user.email, "full_name": user.full_name,
                  "is_accountant": user.is_accountant,
@@ -65,16 +80,43 @@ def login(body: LoginIn, db: DbDep, request: Request):
 def register(body: RegisterIn, db: DbDep):
     if db.scalar(select(User).where(User.email == body.email.lower())):
         raise HTTPException(status.HTTP_409_CONFLICT, "An account with that email already exists")
+    role = (body.role or Role.OWNER).lower()
+    if role not in (Role.OWNER, Role.MANAGER, Role.ACCOUNTANT):
+        raise HTTPException(422, "role must be owner, manager or accountant")
+    biz = None
+    if role == Role.OWNER:
+        if not (body.business_name or "").strip():
+            raise HTTPException(422, "An owner account needs a business name")
+    else:
+        code = (body.join_code or "").strip().upper()
+        biz = db.scalar(select(Business).where(Business.join_code == code)) if code else None
+        if biz is None:
+            raise HTTPException(422, "That join code does not match any business. "
+                                     "Ask the owner for the code shown in Settings - Team.")
     user = User(id=_uid(), email=body.email.lower(), full_name=body.full_name,
-                password_hash=hash_password(body.password))
+                password_hash=hash_password(body.password),
+                is_accountant=(role == Role.ACCOUNTANT))
     db.add(user)
-    if body.business_name:
-        biz = Business(id=_uid(), name=body.business_name, industry=body.industry,
+    db.flush()
+    if role == Role.OWNER:
+        biz = Business(id=_uid(), name=body.business_name.strip(), industry=body.industry,
                        is_demo=False, safety_buffer_paise=0)
         db.add(biz)
         db.flush()
+        approvals.ensure_join_code(db, biz)
         db.add(Membership(id=_uid(), user_id=user.id, business_id=biz.id, role=Role.OWNER,
-                          scopes_json=["read:*", "write:*"]))
+                          scopes_json=["read:*", "write:*"],
+                          status=MembershipStatus.APPROVED, approvals_json=[]))
+    else:
+        m = Membership(id=_uid(), user_id=user.id, business_id=biz.id, role=role,
+                       scopes_json=["read:*", "write:*"],
+                       status=MembershipStatus.PENDING, approvals_json=[])
+        db.add(m)
+        db.flush()
+        db.add(AuditLog_(business_id=biz.id, user_id=user.id, action="membership.request",
+                         entity="membership", entity_id=m.id,
+                         detail_json={"role": role,
+                                      "requires": approvals.required_for(db, m)}))
     db.commit()
     return _session_payload(db, user)
 
