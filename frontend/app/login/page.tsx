@@ -3,8 +3,10 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
-import { ArrowRight, Loader2, Lock, Mail, ShieldCheck } from "lucide-react";
-import { Logo } from "@/components/runway/shell";
+import { ArrowRight, Check, Loader2, ShieldCheck, TrendingUp } from "lucide-react";
+import { motion } from "motion/react";
+import { Logo } from "@/components/runway/brand";
+import { EASE_OUT } from "@/components/runway/motion";
 import { api, login, session } from "@/lib/api";
 
 type DemoAccount = { email: string; password: string; role: string; name: string; sees: string };
@@ -20,7 +22,7 @@ export default function LoginPage() {
   useEffect(() => {
     api.get<{ accounts: DemoAccount[] }>("/api/auth/demo-accounts")
       .then((r) => setAccounts(r.accounts)).catch(() => {});
-    // Pin the demo clock so the workspace matches the documented figures.
+    // Pin the demo clock so a judge sees the same workspace the docs describe.
     if (!session.asOf) session.setAsOf("2026-11-07");
   }, []);
 
@@ -37,117 +39,115 @@ export default function LoginPage() {
   }
 
   return (
-    <div className="grid min-h-dvh lg:grid-cols-2">
-      {/* left: the promise */}
-      <section className="relative hidden flex-col justify-between border-r border-border bg-surface/30 p-10 lg:flex xl:p-14">
-        <Link href="/"><Logo /></Link>
-        <div className="max-w-md">
-          <h1 className="font-display text-[32px] font-semibold leading-[1.12] tracking-[-0.02em] text-balance xl:text-4xl">
-            See the business.
-            <br />Understand the future.
-            <br /><span className="text-primary">Test the decision.</span>
-          </h1>
-          <p className="mt-4 text-[14.5px] leading-relaxed text-muted-foreground text-pretty">
-            RUNWAY reconciles your transactions against your invoices and projects
-            thirteen weeks of cash with an honest uncertainty band.
+    <div className="grid min-h-dvh bg-paper lg:grid-cols-[1fr_1.05fr]">
+      {/* left: the form, on paper */}
+      <div className="flex flex-col px-6 py-8 sm:px-12">
+        <Link href="/" aria-label="Runway home"><Logo /></Link>
+        <motion.div
+          initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.6, ease: EASE_OUT }}
+          className="mx-auto flex w-full max-w-[420px] flex-1 flex-col justify-center py-12"
+        >
+          <p className="eyebrow">Welcome back</p>
+          <h1 className="display mt-3 text-[34px] sm:text-[38px]">Sign in to Runway.</h1>
+          <p className="mb-8 mt-2 text-[15px] text-ink-2">See your cash forecast and test the next decision.</p>
+
+          <form onSubmit={submit} className="space-y-5">
+            <div>
+              <label htmlFor="email" className="label">Email</label>
+              <input id="email" className="field" type="email" value={email}
+                     onChange={(e) => setEmail(e.target.value)} autoComplete="username" required />
+            </div>
+            <div>
+              <label htmlFor="pw" className="label">Password</label>
+              <input id="pw" className="field" type="password" value={password}
+                     onChange={(e) => setPassword(e.target.value)} autoComplete="current-password" required />
+            </div>
+            {error && <p role="alert" className="text-sm font-semibold text-loss">{error}</p>}
+            <button type="submit" disabled={busy} className="btn btn-primary h-[50px] w-full">
+              {busy ? <Loader2 className="size-4 animate-spin" /> : <>Sign in <ArrowRight className="size-4" /></>}
+            </button>
+          </form>
+
+          {accounts.length > 0 && (
+            <div className="mt-8 rounded-2xl bg-sage p-5">
+              <p className="text-sm font-semibold">Demo accounts</p>
+              <p className="mt-0.5 text-[13px] text-ink-2">
+                Same sample business, different roles. Password is demo1234.
+              </p>
+              <div className="mt-4 grid gap-2">
+                {accounts.map((a) => (
+                  <button key={a.email} type="button"
+                          onClick={(e) => { setEmail(a.email); setPassword(a.password); submit(e, a.email, a.password); }}
+                          className={`flex items-center justify-between gap-3 rounded-xl border bg-card px-4 py-2.5 text-left text-sm transition hover:border-forest ${email === a.email ? "border-forest" : "border-line"}`}>
+                    <span className="font-semibold">{a.role}</span>
+                    <span className="truncate text-xs text-ink-3">{a.sees}</span>
+                  </button>
+                ))}
+              </div>
+              <p className="mt-4 flex items-start gap-1.5 text-[11px] leading-relaxed text-ink-2">
+                <Check className="mt-0.5 size-3 shrink-0 text-gain" aria-hidden />
+                These accounts exist only in the demonstration workspace and open a
+                synthetic business. Production authentication is separate.
+              </p>
+            </div>
+          )}
+        </motion.div>
+      </div>
+
+      {/* right: the promise, on forest */}
+      <div className="dots relative hidden flex-col justify-between overflow-hidden bg-forest px-10 py-12 text-white lg:flex xl:px-14">
+        <div className="relative"><Logo inverse /></div>
+
+        <div className="relative max-w-lg">
+          <p className="text-sm font-semibold text-lime">Financial intelligence · Indian MSMEs</p>
+          <h2 className="display mt-6 text-[clamp(2.4rem,4vw,3.6rem)]">
+            Know when cash gets tight, <em className="serif-i text-lime">weeks</em> before it does.
+          </h2>
+          <p className="mt-6 max-w-md text-pretty text-[15px] leading-relaxed text-white/75">
+            RUNWAY reconciles your bank, invoices and GST dates into one ledger and
+            projects thirteen weeks of cash with an honest uncertainty band — so you
+            can see a liquidity problem while there is still time to act.
           </p>
-          <ul className="mt-7 space-y-2.5 text-[13.5px] text-muted-foreground">
+          <ul className="mt-8 space-y-3 text-[14px] text-white/85">
             {[
               "Actual, predicted and simulated kept strictly apart",
               "Every number traceable to an invoice or a transaction",
               "Nothing moves money without your approval",
             ].map((t) => (
               <li key={t} className="flex items-start gap-2.5">
-                <ShieldCheck className="mt-0.5 size-4 shrink-0 text-fin-gain" aria-hidden />
+                <ShieldCheck className="mt-0.5 size-4 shrink-0 text-lime" aria-hidden />
                 <span>{t}</span>
               </li>
             ))}
           </ul>
-        </div>
-        <p className="text-xs text-muted-foreground">
-          INNOVASIA 2K26 · PS-04 · Vasavi College of Engineering
-        </p>
-      </section>
 
-      {/* right: the form */}
-      <section className="flex items-center justify-center p-6 sm:p-10">
-        <div className="w-full max-w-sm">
-          <div className="lg:hidden"><Logo /></div>
-          <h2 className="mt-8 font-display text-2xl font-semibold tracking-tight lg:mt-0">
-            Sign in
-          </h2>
-          <p className="mt-1 text-[13.5px] text-muted-foreground">
-            Use a demo account below, or sign in with your own.
-          </p>
-
-          <form onSubmit={submit} className="mt-7 space-y-4">
-            <label className="block">
-              <span className="mb-1.5 block text-xs font-medium text-muted-foreground">Email</span>
-              <span className="relative block">
-                <Mail className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
-                <input type="email" value={email} onChange={(e) => setEmail(e.target.value)}
-                       required autoComplete="username"
-                       className="h-11 w-full rounded-lg border border-border bg-surface pl-10 pr-3 text-sm outline-none transition-colors focus:border-primary/60" />
+          <div className="mt-10 rounded-2xl border border-white/15 bg-white/10 p-5 backdrop-blur-sm">
+            <div className="flex items-center justify-between gap-3">
+              <div>
+                <p className="text-[11px] font-semibold uppercase tracking-wider text-white/60">13-week cash position</p>
+                <p className="num mt-1.5 text-2xl font-semibold">₹4.77 L → ₹16.90 L</p>
+              </div>
+              <span className="grid size-10 place-items-center rounded-xl bg-lime text-forest">
+                <TrendingUp className="size-5" aria-hidden />
               </span>
-            </label>
-            <label className="block">
-              <span className="mb-1.5 block text-xs font-medium text-muted-foreground">Password</span>
-              <span className="relative block">
-                <Lock className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
-                <input type="password" value={password} onChange={(e) => setPassword(e.target.value)}
-                       required autoComplete="current-password"
-                       className="h-11 w-full rounded-lg border border-border bg-surface pl-10 pr-3 text-sm outline-none transition-colors focus:border-primary/60" />
-              </span>
-            </label>
-
-            {error && (
-              <p role="alert"
-                 className="rounded-lg border border-fin-loss/30 bg-fin-loss-soft px-3 py-2 text-xs text-fin-loss">
-                {error}
-              </p>
-            )}
-
-            <button type="submit" disabled={busy}
-                    className="inline-flex h-11 w-full items-center justify-center gap-2 rounded-lg bg-primary text-sm font-semibold text-primary-foreground transition-opacity hover:opacity-90 disabled:opacity-60">
-              {busy ? <Loader2 className="size-4 animate-spin" /> : <>Sign in <ArrowRight className="size-4" /></>}
-            </button>
-          </form>
-
-          {accounts.length > 0 && (
-            <div className="mt-8">
-              <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-                Demo accounts
-              </p>
-              <ul className="mt-2.5 space-y-2">
-                {accounts.map((a) => (
-                  <li key={a.email}>
-                    <button
-                      onClick={(e) => { setEmail(a.email); setPassword(a.password); submit(e, a.email, a.password); }}
-                      className="group flex w-full items-center gap-3 rounded-lg border border-border bg-surface px-3 py-2.5 text-left transition-colors hover:bg-surface-hover">
-                      <span className="grid size-8 shrink-0 place-items-center rounded-full bg-primary/15 text-[11px] font-semibold text-primary">
-                        {a.name.split(" ").map((p) => p[0]).slice(0, 2).join("")}
-                      </span>
-                      <span className="min-w-0 flex-1">
-                        <span className="block text-[13px] font-medium">{a.role}</span>
-                        <span className="block truncate text-[11px] text-muted-foreground">{a.sees}</span>
-                      </span>
-                      <ArrowRight className="size-3.5 shrink-0 text-muted-foreground transition-transform group-hover:translate-x-0.5" />
-                    </button>
-                  </li>
-                ))}
-              </ul>
-              <p className="mt-3 text-[11px] leading-relaxed text-muted-foreground">
-                These accounts open a synthetic business. Production authentication
-                is separate.
-              </p>
             </div>
-          )}
-
-          <p className="mt-8 text-[11.5px] text-muted-foreground">
-            <Link href="/" className="hover:text-foreground">← Back to runway</Link>
-          </p>
+            <svg viewBox="0 0 320 74" className="mt-3 w-full" aria-hidden>
+              <path d="M0 62 L27 55 L53 48 L80 50 L107 42 L133 36 L160 31 L187 34 L213 25 L240 19 L267 16 L293 18 L320 8"
+                    fill="none" stroke="#d3f26b" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" />
+              <path d="M0 62 L27 58 L53 60 L80 64 L107 68 L133 69 L160 67 L187 64 L213 58 L240 48 L267 40 L293 32 L320 22"
+                    fill="none" stroke="rgba(255,255,255,.55)" strokeWidth="1.6" strokeDasharray="4 4" strokeLinecap="round" />
+            </svg>
+            <p className="mt-2 text-[10px] text-white/60">
+              solid · predicted P50 &nbsp; / &nbsp; dashed · P10 downside
+            </p>
+          </div>
         </div>
-      </section>
+
+        <p className="relative text-[11px] text-white/60">
+          INNOVASIA 2K26 · PS-04 · Team SignalForge · Vasavi College of Engineering
+        </p>
+      </div>
     </div>
   );
 }

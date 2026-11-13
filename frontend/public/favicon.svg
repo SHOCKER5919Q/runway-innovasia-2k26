@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-label="RUNWAY">
+  <rect width="64" height="64" rx="16" fill="#0C3B2A"/>
+  <path d="M13 43 L27 29 L37 35 L51 17" fill="none" stroke="#D3F26B" stroke-width="5" stroke-linecap="round" stroke-linejoin="round"/>
+  <path d="M45 17 H51 V23" fill="none" stroke="#D3F26B" stroke-width="5" stroke-linecap="round" stroke-linejoin="round"/>
+  <path d="M13 51 H51" stroke="#FFFFFF" stroke-opacity=".22" stroke-width="2" stroke-linecap="round"/>
+</svg>

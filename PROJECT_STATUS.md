@@ -46,9 +46,14 @@ RUNWAY_DATABASE_URL="postgresql+psycopg:///runway?host=/run/postgresql" ./run.sh
 - Architecture settled and documented before any product code was written.
 
 ### Phase 1 — product foundation ✅
-- Design system derived from the reference board (`frontend/app/globals.css`):
-  OKLCH tokens, light and dark from one set, financial semantics separated from
-  brand colour.
+- Design system: `DESIGN.md` v3 / Grove (`frontend/app/globals.css`) — the
+  user's Drive reference applied everywhere: warm paper default, forest primary,
+  one lime accent, Plus Jakarta Sans, pill buttons and 20px cards, light and dark
+  from one scoped token set, financial semantics separated from brand colour.
+  Reference analysis in `docs/DRIVE_REFERENCE.md`; earlier research and citations
+  (v2 history) in `docs/DESIGN_RESEARCH.md`. The v1 WebGL hero, intro curtain
+  and chapter-rail files were deleted; the landing is `force-dynamic` with
+  no-cache headers so a stale tab cannot show old dark glass panels.
 - Authentication: PBKDF2-HMAC-SHA256, JWT bearer tokens, four roles, per-business
   membership, purpose-scoped consent records.
 - 28 ORM tables with tenant scoping, versioning and provenance columns.

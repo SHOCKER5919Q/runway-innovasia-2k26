@@ -13,47 +13,49 @@ export const metadata: Metadata = {
   applicationName: "RUNWAY",
   keywords: ["MSME", "cash flow forecasting", "India", "GST", "working capital",
              "financial intelligence", "digital twin"],
+  icons: { icon: "/favicon.svg" },
 };
 
 export const viewport: Viewport = {
   themeColor: [
-    { media: "(prefers-color-scheme: dark)", color: "#06100B" },
-    { media: "(prefers-color-scheme: light)", color: "#fbfbfe" },
+    { media: "(prefers-color-scheme: dark)", color: "#0B1712" },
+    { media: "(prefers-color-scheme: light)", color: "#F6F4EE" },
   ],
   width: "device-width",
   initialScale: 1,
 };
 
-/* Set the theme before first paint so a light-mode user never sees a dark flash. */
+/* Set the theme before first paint. The Drive reference is light by default;
+   dark is an explicit choice, not a guess from the operating system. */
 const THEME_BOOT = `
 (function(){try{
-  var t = localStorage.getItem('runway.theme') || 'dark';
+  var t = localStorage.getItem('runway.theme') || 'light';
   document.documentElement.dataset.theme = t;
-}catch(e){document.documentElement.dataset.theme='dark';}})();
+}catch(e){document.documentElement.dataset.theme='light';}})();
 `;
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="en-IN" data-theme="dark" suppressHydrationWarning>
+    <html lang="en-IN" data-theme="light" suppressHydrationWarning>
       <head>
         <script dangerouslySetInnerHTML={{ __html: THEME_BOOT }} />
-        <link rel="preconnect" href="https://fonts.googleapis.com" />
-        <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="" />
-        <link
-          href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Sora:wght@500;600;700&family=JetBrains+Mono:wght@400;500&display=swap"
-          rel="stylesheet"
-        />
+        <meta httpEquiv="Cache-Control" content="no-cache, no-store, must-revalidate" />
+        <meta httpEquiv="Pragma" content="no-cache" />
+        <meta httpEquiv="Expires" content="0" />
+        <meta name="runway-design" content="grove-v3-drive-reference" />
+        <link rel="preload" href="/fonts/plus-jakarta-sans-latin.woff2" as="font" type="font/woff2" crossOrigin="" />
         <style>{`
           :root {
-            --font-geist-sans: 'Inter';
-            --font-display: 'Sora';
+            --font-geist-sans: 'Plus Jakarta Sans';
+            --font-display: 'Plus Jakarta Sans';
+            --font-editorial: 'Instrument Serif';
             --font-geist-mono: 'JetBrains Mono';
           }
         `}</style>
       </head>
       <body>
         <a href="#main"
-           className="sr-only focus:not-sr-only focus:fixed focus:left-4 focus:top-4 focus:z-[200] focus:rounded-md focus:bg-primary focus:px-4 focus:py-2 focus:text-primary-foreground">
+           className="sr-only focus:not-sr-only focus:fixed focus:left-4 focus:top-4 focus:z-[200] focus:rounded-full focus:bg-forest focus:px-4 focus:py-2 focus:text-white">
           Skip to content
         </a>
         <div id="main">{children}</div>
