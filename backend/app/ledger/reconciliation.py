@@ -19,7 +19,7 @@ import re
 from dataclasses import dataclass, field
 from datetime import date, timedelta
 
-from sqlalchemy import select
+from sqlalchemy import func, select
 
 from app.core.enums import (
     Direction, Evidence, InvoiceKind, InvoiceStatus, ReconStatus, TxnCategory,
@@ -44,18 +44,45 @@ def _extract_invoice_refs(text: str) -> list[str]:
     return [m.group(1).upper().replace("/", "-") for m in INVOICE_NO_RE.finditer(text or "")]
 
 
-def _candidate_invoices(db, txn: Transaction) -> list[Invoice]:
+def _invoice_pre_settled_unlinked(db, inv: Invoice) -> int:
+    """Portion of ``settled_paise`` imported directly on the invoice without an Allocation row."""
+    alloc_sum = db.scalar(
+        select(func.coalesce(func.sum(Allocation.amount_paise), 0)).where(Allocation.invoice_id == inv.id)
+    ) or 0
+    return max(0, (inv.settled_paise or 0) - int(alloc_sum))
+
+
+def _candidate_invoices(db, txn: Transaction, refs: set[str] | None = None) -> list[Invoice]:
     kind = InvoiceKind.SALES if txn.direction == Direction.CREDIT else InvoiceKind.PURCHASE
     q = select(Invoice).where(
         Invoice.business_id == txn.business_id,
         Invoice.kind == kind,
         Invoice.status.in_([InvoiceStatus.OPEN, InvoiceStatus.PART_PAID, InvoiceStatus.OVERDUE]),
         Invoice.issue_date <= txn.value_date + timedelta(days=DATE_WINDOW_AFTER),
-        Invoice.issue_date >= txn.value_date - timedelta(days=DATE_WINDOW_BEFORE + 180),
+        Invoice.issue_date >= txn.value_date - timedelta(days=365),
     )
     if txn.counterparty_id:
         q = q.where(Invoice.counterparty_id == txn.counterparty_id)
-    return list(db.scalars(q).all())
+    candidates = list(db.scalars(q).all())
+    if refs:
+        seen_ids = {inv.id for inv in candidates}
+        # Allow linking explicit invoice-referenced payments to already-settled
+        # invoices whose paid balance was imported from an invoice CSV without txns.
+        paid_candidates = db.scalars(
+            select(Invoice).where(
+                Invoice.business_id == txn.business_id,
+                Invoice.kind == kind,
+                Invoice.status == InvoiceStatus.PAID,
+            )
+        ).all()
+        for inv in paid_candidates:
+            if inv.id in seen_ids:
+                continue
+            norm_no = inv.invoice_no.upper().replace("/", "-")
+            if (norm_no in refs or any(norm_no in r or r in norm_no for r in refs)) and _invoice_pre_settled_unlinked(db, inv) > 0:
+                candidates.append(inv)
+                seen_ids.add(inv.id)
+    return candidates
 
 
 def match_transaction(db, txn: Transaction) -> MatchResult:
@@ -75,11 +102,6 @@ def match_transaction(db, txn: Transaction) -> MatchResult:
         res.note = f"category '{txn.category}' is not invoice-settling"
         return res
 
-    candidates = _candidate_invoices(db, txn)
-    if not candidates:
-        res.note = "no open invoice for this counterparty in the date window"
-        return res
-
     # ``unallocated_paise`` already measures against the settleable amount
     # (gross for a gateway settlement), so re-running reconciliation over an
     # already partly-matched transaction can never allocate the fee twice.
@@ -88,21 +110,29 @@ def match_transaction(db, txn: Transaction) -> MatchResult:
         return res
 
     refs = set(_extract_invoice_refs(f"{txn.narration} {txn.reference_no or ''}"))
+    candidates = _candidate_invoices(db, txn, refs=refs)
+    if not candidates:
+        res.note = "no open invoice for this counterparty in the date window"
+        return res
 
-    scored: list[tuple[float, Invoice, str]] = []
+    scored: list[tuple[float, Invoice, str, int]] = []
     for inv in candidates:
-        if inv.outstanding_paise <= 0:
+        norm_no = inv.invoice_no.upper().replace("/", "-")
+        ref_matched = norm_no in refs or any(norm_no in r or r in norm_no for r in refs)
+        pre_unlinked = _invoice_pre_settled_unlinked(db, inv) if ref_matched else 0
+        capacity = inv.outstanding_paise + pre_unlinked
+        if capacity <= 0:
             continue
         score, why = 0.0, []
-        norm_no = inv.invoice_no.upper().replace("/", "-")
-        if norm_no in refs or any(norm_no in r or r in norm_no for r in refs):
+        if ref_matched:
             score += 0.60; why.append(f"invoice number {inv.invoice_no} appears in the narration")
         if txn.counterparty_id and inv.counterparty_id == txn.counterparty_id:
             score += 0.20; why.append("counterparty matches")
-        # Amount agreement
-        if abs(inv.outstanding_paise - available) <= max(100, int(0.001 * available)):
-            score += 0.25; why.append("amount equals the outstanding balance exactly")
-        elif available < inv.outstanding_paise:
+        # Amount agreement (prefer unlinked pre-settled amount when reconciling historical imports)
+        compare_amt = pre_unlinked if pre_unlinked > 0 else inv.outstanding_paise
+        if abs(compare_amt - available) <= max(100, int(0.001 * available)):
+            score += 0.25; why.append("amount equals the invoice balance exactly")
+        elif available < compare_amt or available < capacity:
             score += 0.08; why.append("amount is a plausible part payment")
         # Timing: a payment near the due date is more likely to be for it.
         gap = abs((txn.value_date - inv.due_date).days)
@@ -113,7 +143,7 @@ def match_transaction(db, txn: Transaction) -> MatchResult:
         if txn.value_date < inv.issue_date - timedelta(days=3):
             score -= 0.35; why.append("payment predates the invoice")
         if score > 0:
-            scored.append((score, inv, "; ".join(why)))
+            scored.append((score, inv, "; ".join(why), capacity))
 
     if not scored:
         res.note = "no candidate scored above zero"
@@ -124,13 +154,13 @@ def match_transaction(db, txn: Transaction) -> MatchResult:
 
     remaining = available
     best_conf = 0.0
-    for score, inv, why in scored:
+    for score, inv, why, capacity in scored:
         if remaining <= 0:
             break
         conf = min(0.99, score)
         if conf < 0.30:
             continue
-        take = min(remaining, inv.outstanding_paise)
+        take = min(remaining, capacity)
         if take <= 0:
             continue
         res.allocations.append((inv.id, take, conf, why))
@@ -155,7 +185,12 @@ def apply_match(db, txn: Transaction, res: MatchResult) -> list[Allocation]:
         inv = db.get(Invoice, invoice_id)
         if inv is None:
             continue
-        paise = min(paise, inv.outstanding_paise)
+        alloc_sum_before = int(db.scalar(
+            select(func.coalesce(func.sum(Allocation.amount_paise), 0)).where(Allocation.invoice_id == inv.id)
+        ) or 0)
+        pre_unlinked = max(0, (inv.settled_paise or 0) - alloc_sum_before)
+        max_capacity = max(0, inv.total_paise - (inv.written_off_paise or 0) - alloc_sum_before)
+        paise = min(paise, max_capacity)
         if paise <= 0:
             continue
         alloc = Allocation(
@@ -165,12 +200,15 @@ def apply_match(db, txn: Transaction, res: MatchResult) -> list[Allocation]:
         db.add(alloc)
         created.append(alloc)
 
-        inv.settled_paise += paise
+        # Avoid double-counting pre-settled paid balances imported from an invoice sheet.
+        incremental_settled = max(0, paise - pre_unlinked)
+        inv.settled_paise = min(inv.total_paise, (inv.settled_paise or 0) + incremental_settled)
         if inv.first_payment_date is None or txn.value_date < inv.first_payment_date:
             inv.first_payment_date = txn.value_date
         if inv.outstanding_paise <= 0:
             inv.status = InvoiceStatus.PAID
-            inv.settled_date = txn.value_date
+            if alloc_sum_before == 0 or inv.settled_date is None or txn.value_date > inv.settled_date:
+                inv.settled_date = txn.value_date
         else:
             inv.status = InvoiceStatus.PART_PAID
         txn.allocated_paise = min(txn.settleable_paise, txn.allocated_paise + paise)

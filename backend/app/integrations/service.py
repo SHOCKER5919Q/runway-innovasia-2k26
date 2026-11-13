@@ -13,7 +13,7 @@ from app.integrations.base import REGISTRY, NormalisedRow
 from app.ledger.classifier import classify
 from app.ledger.entities import resolve_counterparty
 from app.ledger.normalise import detect_duplicate, fingerprint, mark_suspected_duplicate, party_key
-from app.ledger.reconciliation import apply_match, match_transaction, refresh_overdue
+from app.ledger.reconciliation import apply_match, match_transaction, reconcile_business, refresh_overdue
 from app.models import Account, Counterparty, ImportBatch, Invoice, Transaction, _uid
 
 
@@ -40,6 +40,7 @@ def import_file(db, *, business_id: str, account_id: str, adapter_key: str,
     # database would let an in-file duplicate through on a dry run, where
     # nothing has been flushed yet.
     seen_in_batch: dict[str, int] = {}
+    seen_invoices: set[tuple[str, str]] = set()
 
     for item in parsed:
         if isinstance(item, NormalisedRow):
@@ -52,10 +53,34 @@ def import_file(db, *, business_id: str, account_id: str, adapter_key: str,
             continue
 
         if kind == "invoice":
+            inv_kind = InvoiceKind.SALES if row.get("kind") == "sales" else InvoiceKind.PURCHASE
+            inv_no = str(row["invoice_no"])[:60]
+            dup_inv_key = (inv_kind, inv_no)
+            existing_inv = db.scalar(select(Invoice).where(
+                Invoice.business_id == business_id,
+                Invoice.kind == inv_kind,
+                Invoice.invoice_no == inv_no,
+            ))
+            if existing_inv or dup_inv_key in seen_invoices:
+                dup_hard += 1
+                preview.append({
+                    "kind": "duplicate_rejected",
+                    "date": row["issue_date"].isoformat(),
+                    "invoice_no": inv_no,
+                    "counterparty": row.get("counterparty"),
+                    "amount_paise": int(row.get("total_paise") or 0),
+                    "reason": f"{inv_kind} invoice {inv_no} already exists",
+                })
+                continue
+            seen_invoices.add(dup_inv_key)
             inv, note = _build_invoice(db, business_id, row, cache)
-            preview.append({"kind": "invoice", "invoice_no": inv.invoice_no,
-                            "date": inv.issue_date.isoformat(),
-                            "amount_paise": inv.total_paise, "note": note})
+            preview.append({
+                "kind": "invoice", "invoice_no": inv.invoice_no,
+                "date": inv.issue_date.isoformat(),
+                "counterparty": row.get("counterparty"),
+                "category": inv.kind,
+                "amount_paise": inv.total_paise, "reason": note, "note": note,
+            })
             if not dry_run:
                 db.add(inv)
                 created_inv.append(inv)
@@ -100,9 +125,20 @@ def import_file(db, *, business_id: str, account_id: str, adapter_key: str,
             dup_soft += 1
             mark_suspected_duplicate(txn, existing_id, reason)
 
-        cp_id, cp_conf, cp_why = resolve_counterparty(
-            db, business_id, f"{row.narration} {row.counterparty_hint or ''}",
-            row.direction, cache=cache)
+        cp_id, cp_conf, cp_why = None, 0.0, "no counterparty master data"
+        if row.counterparty_hint:
+            parties = cache.get(business_id)
+            if parties is None:
+                parties = list(db.scalars(select(Counterparty).where(Counterparty.business_id == business_id)).all())
+                cache[business_id] = parties
+            hint_key = party_key(row.counterparty_hint)
+            exact_cp = next((p for p in parties if p.normalised_name == hint_key), None)
+            if exact_cp is not None:
+                cp_id, cp_conf, cp_why = exact_cp.id, 1.0, f"exact counterparty column match '{exact_cp.name}'"
+        if cp_id is None:
+            cp_id, cp_conf, cp_why = resolve_counterparty(
+                db, business_id, f"{row.narration} {row.counterparty_hint or ''}",
+                row.direction, cache=cache)
         txn.counterparty_id = cp_id
         cp_type = None
         if cp_id:
@@ -135,11 +171,53 @@ def import_file(db, *, business_id: str, account_id: str, adapter_key: str,
     matched = 0
     if not dry_run:
         db.flush()
+        if created_inv:
+            # If payments were imported before invoices, link unresolved counterparties and reconcile them now.
+            party_cache: dict = {}
+            unresolved_txns = db.scalars(
+                select(Transaction).where(
+                    Transaction.business_id == business_id,
+                    Transaction.counterparty_id.is_(None),
+                )
+            ).all()
+            if unresolved_txns:
+                parties = list(db.scalars(select(Counterparty).where(Counterparty.business_id == business_id)).all())
+                by_key = {p.normalised_name: p for p in parties}
+                party_cache[business_id] = parties
+                for ut in unresolved_txns:
+                    hint = ""
+                    if isinstance(ut.raw_json, dict):
+                        hint = str(
+                            ut.raw_json.get("Customer_Name") or ut.raw_json.get("customer_name")
+                            or ut.raw_json.get("Supplier_Name") or ut.raw_json.get("supplier_name")
+                            or ut.raw_json.get("party") or ut.raw_json.get("Party") or ""
+                        ).strip()
+                    exact_cp = by_key.get(party_key(hint)) if hint else None
+                    if exact_cp is not None:
+                        ut.counterparty_id = exact_cp.id
+                        cp_type = exact_cp.party_type
+                    else:
+                        cp_id_resolved, _, _ = resolve_counterparty(
+                            db, business_id, f"{ut.narration} {hint}".strip(), ut.direction, cache=party_cache)
+                        if cp_id_resolved is None:
+                            continue
+                        ut.counterparty_id = cp_id_resolved
+                        cp_obj = db.get(Counterparty, cp_id_resolved)
+                        cp_type = cp_obj.party_type if cp_obj else None
+                    cat, conf, rule = classify(ut.narration, ut.direction, counterparty_type=cp_type)
+                    ut.category, ut.category_confidence, ut.category_source = cat, conf, rule
+                    if ut.recon_status == ReconStatus.IGNORED:
+                        ut.recon_status = ReconStatus.UNRECONCILED
+                db.flush()
+
         for txn in created_txn:
             res = match_transaction(db, txn)
             apply_match(db, txn, res)
             if res.status in (ReconStatus.MATCHED, ReconStatus.PARTIALLY_MATCHED):
                 matched += 1
+        if created_inv and not created_txn:
+            rstats = reconcile_business(db, business_id)
+            matched += int(rstats.get("matched", 0)) + int(rstats.get("partial", 0))
         refresh_overdue(db, business_id, today or date.today())
         db.add(batch)
         db.flush()
@@ -170,6 +248,7 @@ def import_file(db, *, business_id: str, account_id: str, adapter_key: str,
 
 
 def _build_invoice(db, business_id: str, row: dict, cache: dict) -> tuple[Invoice, str]:
+    from datetime import timedelta
     name = (row.get("counterparty") or "Unidentified party").strip() or "Unidentified party"
     key = party_key(name)
     cp = db.scalar(select(Counterparty).where(
@@ -179,22 +258,43 @@ def _build_invoice(db, business_id: str, row: dict, cache: dict) -> tuple[Invoic
         cp = Counterparty(
             id=_uid(), business_id=business_id, name=name, normalised_name=key,
             party_type=("customer" if row.get("kind") == "sales" else "supplier"),
-            gstin=row.get("gstin"), credit_days=30)
+            gstin=row.get("gstin"),
+            msme_class=row.get("msme_class"),
+            credit_days=int(row.get("credit_days") or 30))
         db.add(cp)
         db.flush()
         note = "created a new counterparty"
+    elif row.get("msme_class") and not cp.msme_class:
+        cp.msme_class = row.get("msme_class")
     total = int(row.get("total_paise") or 0)
-    taxable = int(row.get("taxable_paise") or round(total / 1.18))
-    tax = int(row.get("tax_paise") or (total - taxable))
+    tax = row.get("tax_paise")
+    if tax is not None:
+        tax = int(tax)
+        taxable = int(row.get("taxable_paise") if row.get("taxable_paise") is not None else (total - tax))
+    else:
+        taxable = int(row.get("taxable_paise") if row.get("taxable_paise") is not None else round(total / 1.18))
+        tax = total - taxable
     issue = row["issue_date"]
+    credit_days = int(row.get("credit_days") if row.get("credit_days") is not None else cp.credit_days)
+    due = row.get("due_date") or (issue + timedelta(days=credit_days))
+    settled = min(total, max(0, int(row.get("settled_paise") or 0)))
+    settled_date = row.get("settled_date")
+    if settled >= total:
+        status = InvoiceStatus.PAID
+        settled_date = settled_date or due
+    elif settled > 0:
+        status = InvoiceStatus.PART_PAID
+    else:
+        status = InvoiceStatus.OPEN
     inv = Invoice(
         id=_uid(), business_id=business_id, counterparty_id=cp.id,
         kind=InvoiceKind.SALES if row.get("kind") == "sales" else InvoiceKind.PURCHASE,
         invoice_no=str(row["invoice_no"])[:60], issue_date=issue,
-        due_date=issue + __import__("datetime").timedelta(days=cp.credit_days),
-        credit_days=cp.credit_days, taxable_paise=taxable, tax_paise=tax,
-        total_paise=total, settled_paise=0, written_off_paise=0,
-        status=InvoiceStatus.OPEN, source_system=row.get("source", "import"),
+        due_date=due, credit_days=credit_days,
+        taxable_paise=taxable, tax_paise=tax, total_paise=total,
+        settled_paise=settled, written_off_paise=0,
+        status=status, settled_date=settled_date,
+        source_system=row.get("source", "import"),
         evidence=Evidence.IMPORTED_ACTUAL, raw_json={k: str(v) for k, v in row.items()
                                                      if k != "__type"})
     return inv, note
