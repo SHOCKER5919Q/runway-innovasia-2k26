@@ -128,12 +128,17 @@ export default function TwinPage() {
 
 /* ── relationship graph (hand-drawn SVG radial layout) ─────────── */
 
+function finiteAbs(v: unknown): number {
+  return typeof v === "number" && Number.isFinite(v) ? Math.abs(v) : 0;
+}
+
 function GraphView({ data, loading }: { data: any; loading: boolean }) {
   const [hover, setHover] = useState<string | null>(null);
   const layout = useMemo(() => {
-    if (!data) return null;
+    if (!data?.nodes?.length) return null;
     const W = 980, H = 520, cx = W / 2, cy = H / 2;
     const biz = data.nodes.find((n: any) => n.type === "business");
+    if (!biz) return null;
     const customers = data.nodes.filter((n: any) => n.type === "customer");
     const suppliers = data.nodes.filter((n: any) => n.type === "supplier");
     const accounts = data.nodes.filter((n: any) => n.type === "account");
@@ -141,29 +146,34 @@ function GraphView({ data, loading }: { data: any; loading: boolean }) {
     const pos = new Map<string, { x: number; y: number; r: number; n: any }>();
     pos.set(biz.id, { x: cx, y: cy, r: 34, n: biz });
 
+    // Use absolute finite magnitude so overdrawn / negative account balances size cleanly instead of Math.sqrt(negative) -> NaN.
     const maxV = Math.max(1, ...data.nodes.filter((n: any) => n.type !== "business")
-      .map((n: any) => n.value));
+      .map((n: any) => finiteAbs(n.value)));
+    const radius = (v: unknown, base: number, scale: number) =>
+      base + scale * Math.sqrt(finiteAbs(v) / maxV);
+
     const place = (arr: any[], x: number, spread: number) => {
       arr.forEach((n, i) => {
         const t = arr.length === 1 ? 0.5 : i / (arr.length - 1);
         pos.set(n.id, {
           x, y: cy - spread / 2 + t * spread,
-          r: 8 + 16 * Math.sqrt(n.value / maxV), n,
+          r: radius(n.value, 8, 16), n,
         });
       });
     };
     place(customers, 130, 420);
     place(suppliers, W - 130, 420);
-    place(accounts, cx - 150, 0);
+    const acctStep = Math.min(120, 600 / Math.max(1, accounts.length));
+    const acctStart = cx - ((accounts.length - 1) * acctStep) / 2;
     accounts.forEach((n: any, i: number) => {
-      pos.set(n.id, { x: cx - 120 + i * 120, y: cy - 170,
-                      r: 10 + 12 * Math.sqrt(n.value / maxV), n });
+      pos.set(n.id, { x: acctStart + i * acctStep, y: cy - 170,
+                      r: radius(n.value, 10, 12), n });
     });
     obligations.forEach((n: any, i: number) => {
       const t = obligations.length === 1 ? 0.5 : i / (obligations.length - 1);
       pos.set(n.id, { x: cx - 300 + t * 600, y: cy + 190, r: 7, n });
     });
-    const edges = data.edges.filter((e: any) => pos.has(e.source) && pos.has(e.target));
+    const edges = (data.edges ?? []).filter((e: any) => pos.has(e.source) && pos.has(e.target));
     return { W, H, pos, edges, biz };
   }, [data]);
 

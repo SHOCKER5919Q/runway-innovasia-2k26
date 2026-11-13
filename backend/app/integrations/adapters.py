@@ -51,17 +51,19 @@ def _norm(h: str) -> str:
 
 # Synonyms seen across Indian bank statement exports.
 COLUMNS = {
-    "date": ["date", "txndate", "transactiondate", "valuedate", "vdate", "dateoftransaction"],
+    "date": ["date", "txndate", "transactiondate", "valuedate", "vdate", "dateoftransaction",
+             "paymentdate", "paiddate", "settlementdate", "valuedt", "txndt"],
     "posting_date": ["postingdate", "bookingdate", "postdate"],
     "narration": ["narration", "description", "particulars", "details", "remarks",
-                  "transactionremarks", "transactiondetails"],
+                  "transactionremarks", "transactiondetails", "purpose", "notes", "memo"],
     "reference": ["chqrefno", "refno", "referenceno", "chequeno", "utr", "utrno",
-                  "transactionid", "txnid", "referencenumber", "chqnoref"],
+                  "transactionid", "txnid", "referencenumber", "chqnoref", "reference", "paymentid"],
     "debit": ["debit", "withdrawal", "withdrawalamt", "withdrawalamount", "dr",
               "debitamount", "paymentsdebit"],
     "credit": ["credit", "deposit", "depositamt", "depositamount", "cr",
                "creditamount", "receiptscredit"],
-    "amount": ["amount", "transactionamount", "amt", "value"],
+    "amount": ["amount", "transactionamount", "amt", "value", "paymentamountinr",
+               "paymentamount", "amountinr", "txnamount", "netamount", "grossamount"],
     "type": ["type", "drcr", "crdr", "transactiontype", "indicator"],
     "balance": ["balance", "closingbalance", "runningbalance", "balanceamt"],
 }
@@ -98,23 +100,59 @@ class BankStatementCSV(Adapter):
         start = 0
         for i, ln in enumerate(lines[:25]):
             if sum(1 for f in ("date", "narration", "description", "particulars",
-                               "withdrawal", "deposit", "debit", "credit")
+                               "withdrawal", "deposit", "debit", "credit",
+                               "amount", "payment", "reference")
                    if f in ln.lower()) >= 2:
                 start = i
                 break
         reader = csv.DictReader(io.StringIO("\n".join(lines[start:])))
         headers = reader.fieldnames or []
+        norm_map = {_norm(h): h for h in headers}
         cmap = map_columns(headers)
+
+        def pick_extra(*names):
+            for n in names:
+                if n in norm_map:
+                    return norm_map[n]
+            return None
+
+        c_party = pick_extra("customername", "customer", "partyname", "party",
+                             "counterparty", "suppliername", "supplier",
+                             "vendorname", "vendor")
+        c_inv = pick_extra("invoiceid", "invoiceno", "invoicenumber", "billno", "billid")
+        c_mode = pick_extra("paymentmode", "mode", "channel", "paymentmethod")
+        c_payid = pick_extra("paymentid", "receiptid")
+        for key, col in (("party", c_party), ("invoice_ref", c_inv), ("mode", c_mode)):
+            if col and key not in cmap:
+                cmap[key] = col
         rep.column_mapping = cmap
+
         if "date" not in cmap:
+            if ({"invoicedate", "issuedate", "duedate", "invoiceamountinr"} & set(norm_map)) and "paymentdate" not in norm_map:
+                rep.errors.append({
+                    "row": 0,
+                    "error": ("This looks like an invoices CSV (found Invoice_Date / Invoice_Amount columns), "
+                              "not a bank or payments sheet. Switch Source to 'Invoices & supplier bills (CSV)'."),
+                    "headers": headers,
+                })
+                return [], rep
             rep.errors.append({"row": 0, "error": "no recognisable date column",
                                "headers": headers})
             return [], rep
         if not ({"debit", "credit"} & set(cmap)) and "amount" not in cmap:
+            if "invoiceamountinr" in norm_map or "outstandinginr" in norm_map:
+                rep.errors.append({
+                    "row": 0,
+                    "error": ("This looks like an invoices CSV (found Invoice_Amount_INR / Outstanding_INR), "
+                              "not a bank or payments sheet. Switch Source to 'Invoices & supplier bills (CSV)'."),
+                    "headers": headers,
+                })
+                return [], rep
             rep.errors.append({"row": 0, "error": "no amount, debit or credit column",
                                "headers": headers})
             return [], rep
 
+        default_is_debit = bool(c_party and _norm(c_party).startswith(("supplier", "vendor")))
         rows: list[NormalisedRow] = []
         for n, raw in enumerate(reader, start=1):
             rep.rows_seen += 1
@@ -133,7 +171,7 @@ class BankStatementCSV(Adapter):
                     rep.errors.append({"row": n, "error": "unparseable amount"})
                     continue
                 flag = (raw.get(cmap.get("type", ""), "") or "").strip().upper()
-                if flag.startswith("D") or (not flag and amt < 0):
+                if flag.startswith("D") or (not flag and (amt < 0 or (amt > 0 and default_is_debit))):
                     dr = abs(amt)
                 else:
                     cr = abs(amt)
@@ -143,12 +181,28 @@ class BankStatementCSV(Adapter):
                 continue
             direction = Direction.DEBIT if dr > 0 else Direction.CREDIT
             amount = rupees_to_paise(dr if dr > 0 else cr)
+            party = (raw.get(c_party, "") or "").strip() if c_party else ""
+            inv_ref = (raw.get(c_inv, "") or "").strip() if c_inv else ""
+            mode = (raw.get(c_mode, "") or "").strip() if c_mode else ""
+            pay_id = (raw.get(c_payid, "") or "").strip() if c_payid else ""
+            narr = (raw.get(cmap.get("narration", ""), "") or "").strip()
+            if not narr:
+                prep = ("from" if direction == Direction.CREDIT else "to") if party else ""
+                narr = " ".join(p for p in [
+                    mode or ("Receipt" if direction == Direction.CREDIT else "Payment"),
+                    prep,
+                    party,
+                    f"against {inv_ref}" if inv_ref else "",
+                    pay_id,
+                ] if p).strip()
             rows.append(NormalisedRow(
                 value_date=d,
                 posting_date=parse_date(raw.get(cmap.get("posting_date", ""), "")) or d,
                 amount_paise=amount, direction=direction,
-                narration=(raw.get(cmap.get("narration", ""), "") or "").strip(),
-                reference_no=(raw.get(cmap.get("reference", ""), "") or "").strip() or None,
+                narration=narr,
+                reference_no=(raw.get(cmap.get("reference", ""), "") or "").strip() or (pay_id or None),
+                counterparty_hint=party or None,
+                invoice_ref=inv_ref or None,
                 raw=dict(raw)))
             rep.rows_ok += 1
         if rep.rows_rejected:
@@ -182,14 +236,19 @@ class UPISettlementCSV(Adapter):
                     return norm[n]
             return None
 
-        c_date = pick("settlementdate", "date", "settledon", "txndate")
-        c_gross = pick("grossamount", "gross", "amount", "orderamount")
+        c_date = pick("settlementdate", "date", "settledon", "txndate", "paymentdate", "paiddate")
+        c_gross = pick("grossamount", "gross", "amount", "orderamount",
+                       "paymentamountinr", "paymentamount", "amountinr")
         c_fee = pick("fee", "feeamount", "mdr", "commission", "charges")
         c_net = pick("netamount", "net", "settlementamount", "amountsettled")
-        c_ref = pick("settlementid", "utr", "referenceid", "paymentid", "transactionid")
-        c_note = pick("description", "notes", "narration", "invoicenumber", "orderid")
-        rep.column_mapping = {"date": c_date, "gross": c_gross, "fee": c_fee,
-                              "net": c_net, "ref": c_ref}
+        c_ref = pick("settlementid", "utr", "referenceid", "reference", "paymentid", "transactionid")
+        c_note = pick("description", "notes", "narration", "invoicenumber", "invoiceid", "invoiceno", "orderid")
+        c_party = pick("customername", "customer", "partyname", "party", "counterparty")
+        c_inv = pick("invoiceid", "invoiceno", "invoicenumber", "orderid")
+        rep.column_mapping = {k: v for k, v in {
+            "date": c_date, "gross": c_gross, "fee": c_fee,
+            "net": c_net, "ref": c_ref, "party": c_party, "invoice_ref": c_inv,
+        }.items() if v}
         if not c_date or not (c_gross or c_net):
             rep.errors.append({"row": 0, "error": "settlement file needs a date and a "
                                                   "gross or net amount column",
@@ -215,12 +274,16 @@ class UPISettlementCSV(Adapter):
                 fee = gross - net
             ref = (raw.get(c_ref, "") or "").strip() or None
             note = (raw.get(c_note, "") or "").strip()
+            party = (raw.get(c_party, "") or "").strip() if c_party else ""
+            inv_ref = (raw.get(c_inv, "") or "").strip() if c_inv else (note or "")
+            narr = " ".join(p for p in ["SETTLEMENT", ref or "", party, inv_ref if inv_ref != note else "", note] if p).strip()
             rows.append(NormalisedRow(
                 value_date=d, amount_paise=rupees_to_paise(net),
                 direction=Direction.CREDIT,
-                narration=f"SETTLEMENT {ref or ''} {note}".strip(),
-                reference_no=ref, gross_paise=rupees_to_paise(gross),
-                fee_paise=rupees_to_paise(fee), invoice_ref=note or None,
+                narration=narr,
+                reference_no=ref, counterparty_hint=party or None,
+                gross_paise=rupees_to_paise(gross),
+                fee_paise=rupees_to_paise(fee), invoice_ref=inv_ref or None,
                 raw=dict(raw)))
             rep.rows_ok += 1
         rep.warnings.append("The gateway fee is recorded separately; the invoice is "
@@ -375,6 +438,138 @@ class GSTInvoiceJSON(Adapter):
             rep.rows_ok += 1
         rep.warnings.append("Invoice direction is inferred from the file name and the "
                             "columns present. Check the preview before confirming.")
+        return out, rep
+
+
+@register
+class InvoicesCSV(Adapter):
+    key = "invoices_csv"
+    label = "Invoices & supplier bills (CSV)"
+    category = "invoices"
+    status = IntegrationStatus.AVAILABLE
+    description = ("Imports open and past customer invoices and supplier bills from a "
+                   "simple CSV spreadsheet, including due dates, paid amounts, settlement "
+                   "dates and supplier MSME status.")
+    requirements = ["A CSV spreadsheet of sales invoices and/or supplier bills."]
+    accepts = [".csv", ".txt"]
+    produces = "invoices"
+
+    def parse(self, content: bytes, *, filename: str = "") -> tuple[list[dict], ParseReport]:
+        rep = ParseReport(detected_format="invoices_csv")
+        text = content.decode("utf-8-sig", errors="replace")
+        reader = csv.DictReader(io.StringIO(text))
+        headers = reader.fieldnames or []
+        norm = {_norm(h): h for h in headers}
+
+        def pick(*names):
+            for n in names:
+                if n in norm:
+                    return norm[n]
+            return None
+
+        c_kind = pick("kind", "type", "invoicetype", "doctype")
+        c_no = pick("invoiceno", "invoicenumber", "invoiceid", "billno", "billid", "number", "docno", "inum")
+        c_party = pick("party", "partyname", "counterparty", "customer", "customername",
+                       "supplier", "suppliername", "vendor", "vendorname", "name")
+        c_issue = pick("issuedate", "date", "invoicedate", "billdate", "idt")
+        c_due = pick("duedate", "paymentdue", "dueon", "due")
+        c_credit = pick("creditdays", "terms", "paymentterms")
+        c_total = pick("total", "totalamount", "amount", "invoicevalue", "invoiceamount",
+                       "invoiceamountinr", "totalinr", "amountinr", "billamount", "billamountinr",
+                       "val", "value")
+        c_tax = pick("tax", "taxamount", "gst", "gstamount")
+        c_paid = pick("paid", "paidamount", "amountpaid", "amountpaidinr", "paidamountinr",
+                      "settled", "settledamount", "received", "receivedamount")
+        c_outstanding = pick("outstanding", "outstandinginr", "outstandingamount",
+                             "balance", "balancedue", "dueamount", "unpaid")
+        c_sdate = pick("settleddate", "paiddate", "paymentdate")
+        c_purpose = pick("purpose", "description", "narration", "notes", "remarks", "item", "particulars")
+        c_msme = pick("msme", "msmeclass", "udyammicrosmall")
+        c_gstin = pick("gstin", "ctin")
+        rep.column_mapping = {
+            k: v for k, v in {
+                "kind": c_kind, "invoice_no": c_no, "party": c_party,
+                "issue_date": c_issue, "due_date": c_due, "total": c_total,
+                "paid": c_paid or c_outstanding, "settled_date": c_sdate, "msme_class": c_msme,
+            }.items() if v
+        }
+        if not c_no or not c_issue or not c_total or not c_party:
+            if ({"paymentid", "paymentdate", "paymentamountinr"} & set(norm)) and not c_issue:
+                rep.errors.append({
+                    "row": 0,
+                    "error": ("This looks like a customer payments / transactions CSV (found Payment_Date / "
+                              "Payment_Amount_INR), not an invoices sheet. Switch Source to "
+                              "'Bank statement (CSV / Excel export)'."),
+                    "headers": headers,
+                })
+                return [], rep
+            rep.errors.append({"row": 0,
+                               "error": "CSV needs party, invoice_no, issue_date, and total columns",
+                               "headers": headers})
+            return [], rep
+
+        default_kind = "purchase" if c_party and _norm(c_party).startswith(("supplier", "vendor")) else "sales"
+        out: list[dict] = []
+        for n, raw in enumerate(reader, start=1):
+            rep.rows_seen += 1
+            no = (raw.get(c_no, "") or "").strip()
+            party = (raw.get(c_party, "") or "").strip()
+            issue = parse_date(raw.get(c_issue, ""))
+            total = parse_money(raw.get(c_total, ""))
+            if not no or not party or issue is None or total is None or total <= 0:
+                rep.rows_rejected += 1
+                rep.errors.append({"row": n, "error": "missing or invalid party, invoice_no, issue_date, or total"})
+                continue
+            raw_kind = (raw.get(c_kind, "") if c_kind else "").strip().lower()
+            if raw_kind:
+                kind = "purchase" if raw_kind in {"purchase", "payable", "bill", "supplier", "vendor", "ap"} else "sales"
+            else:
+                kind = default_kind
+            due = parse_date(raw.get(c_due, "")) if c_due else None
+            credit_days = 30
+            if c_credit and (raw.get(c_credit, "") or "").strip():
+                try:
+                    credit_days = max(0, int(float(raw[c_credit])))
+                except ValueError:
+                    credit_days = 30
+            elif due is not None:
+                credit_days = max(0, (due - issue).days)
+            total_paise = rupees_to_paise(total)
+            tax_val = parse_money(raw.get(c_tax, "")) if c_tax else None
+            tax_paise = rupees_to_paise(tax_val) if tax_val is not None else None
+            paid_val = parse_money(raw.get(c_paid, "")) if c_paid else None
+            if paid_val is None and c_outstanding:
+                out_val = parse_money(raw.get(c_outstanding, ""))
+                if out_val is not None:
+                    paid_val = max(0.0, total - out_val)
+            settled_paise = min(total_paise, max(0, rupees_to_paise(paid_val or 0.0)))
+            settled_date = parse_date(raw.get(c_sdate, "")) if c_sdate else None
+            if settled_paise >= total_paise and settled_date is None:
+                settled_date = due or issue
+            msme_raw = (raw.get(c_msme, "") if c_msme else "").strip().lower()
+            msme_class = msme_raw if msme_raw in {"micro", "small", "medium", "none"} else None
+            gstin = (raw.get(c_gstin, "") if c_gstin else "").strip().upper()[:15] or None
+            purpose = (raw.get(c_purpose, "") if c_purpose else "").strip() or None
+
+            out.append({
+                "__type": "invoice",
+                "kind": kind,
+                "invoice_no": no,
+                "counterparty": party,
+                "issue_date": issue,
+                "due_date": due,
+                "credit_days": credit_days,
+                "total_paise": total_paise,
+                "tax_paise": tax_paise,
+                "taxable_paise": (total_paise - tax_paise) if tax_paise is not None else None,
+                "settled_paise": settled_paise,
+                "settled_date": settled_date,
+                "msme_class": msme_class,
+                "gstin": gstin,
+                "narration": purpose,
+                "source": "invoices_csv",
+            })
+            rep.rows_ok += 1
         return out, rep
 
 

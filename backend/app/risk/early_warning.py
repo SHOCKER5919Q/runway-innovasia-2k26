@@ -34,7 +34,7 @@ class Finding:
 
 
 def _d(d: date | None) -> str:
-    return d.strftime("%-d %b %Y") if d else "-"
+    return f"{d.day} {d.strftime('%b %Y')}" if d else "-"
 
 
 def evaluate(*, business, as_of: date, position, simulation, behaviour, ageing_ar,

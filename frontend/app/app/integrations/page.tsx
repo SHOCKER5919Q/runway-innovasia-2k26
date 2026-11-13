@@ -114,6 +114,23 @@ export default function IntegrationsPage() {
     run(true, f);
   }
 
+  async function createPrimaryAccount() {
+    setBusy(true); setErr(null);
+    try {
+      const created = await api.post<any>("/api/accounts", {
+        name: "Primary Bank Account",
+        kind: "current",
+        opening_balance_paise: 0,
+      });
+      setAccountId(created.id);
+      accounts.reload();
+    } catch (e: any) {
+      setErr(e?.message ?? "Could not create bank account");
+    } finally {
+      setBusy(false);
+    }
+  }
+
   if (cat.error) return <ErrorState message={cat.error} onRetry={cat.reload} />;
   if (cat.loading || !cat.data) return <LoadingPanel rows={8} />;
 
@@ -143,12 +160,19 @@ export default function IntegrationsPage() {
           </label>
           <label className="block">
             <span className="mb-1 block text-[11px] font-medium text-muted-foreground">Into account</span>
-            <select value={acc} onChange={(e) => setAccountId(e.target.value)}
-                    className="h-9 w-full rounded-lg border border-border bg-surface px-2.5 text-sm outline-none">
-              {accounts.data?.accounts?.map((a: any) => (
-                <option key={a.id} value={a.id}>{a.name}</option>
-              ))}
-            </select>
+            {accounts.data?.accounts?.length ? (
+              <select value={acc} onChange={(e) => setAccountId(e.target.value)}
+                      className="h-9 w-full rounded-lg border border-border bg-surface px-2.5 text-sm outline-none">
+                {accounts.data.accounts.map((a: any) => (
+                  <option key={a.id} value={a.id}>{a.name}</option>
+                ))}
+              </select>
+            ) : (
+              <button type="button" onClick={createPrimaryAccount} disabled={busy}
+                      className="h-9 w-full rounded-lg border border-primary/40 bg-primary-soft px-3 text-left text-xs font-medium text-primary hover:opacity-90">
+                + Create Primary Bank Account
+              </button>
+            )}
           </label>
           <button onClick={loadSample}
                   className="h-9 self-end rounded-lg border border-border px-3 text-xs hover:bg-surface-hover">
@@ -250,20 +274,26 @@ export default function IntegrationsPage() {
               </table>
             </div>
             {preview.errors?.length > 0 && (
-              <details className="mt-2">
-                <summary className="cursor-pointer text-[11px] text-fin-warn">
-                  {preview.errors.length} rows could not be read
-                </summary>
-                <ul className="mt-1 space-y-0.5">
-                  {preview.errors.slice(0, 10).map((e: any, i: number) => (
-                    <li key={i} className="text-[10px] text-muted-foreground">
-                      Row {e.row}: {e.error}{e.value ? ` ("${e.value}")` : ""}
-                    </li>
-                  ))}
-                </ul>
-              </details>
+              preview.preview.length === 0 ? (
+                <div role="alert" className="mt-2 rounded-lg border border-fin-loss/30 bg-fin-loss-soft px-3 py-2 text-xs text-fin-loss">
+                  {preview.errors[0].error}
+                </div>
+              ) : (
+                <details className="mt-2">
+                  <summary className="cursor-pointer text-[11px] text-fin-warn">
+                    {preview.errors.length} rows could not be read
+                  </summary>
+                  <ul className="mt-1 space-y-0.5">
+                    {preview.errors.slice(0, 10).map((e: any, i: number) => (
+                      <li key={i} className="text-[10px] text-muted-foreground">
+                        Row {e.row}: {e.error}{e.value ? ` ("${e.value}")` : ""}
+                      </li>
+                    ))}
+                  </ul>
+                </details>
+              )
             )}
-            {preview.dry_run && (
+            {preview.dry_run && preview.preview.length > 0 && (
               <div className="mt-3 flex items-center justify-between gap-3">
                 <p className="text-[11px] text-muted-foreground">{preview.note}</p>
                 <button onClick={() => run(false)} disabled={busy}

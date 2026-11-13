@@ -81,6 +81,31 @@ export async function login(email: string, password: string) {
   const r = await request<any>("/api/auth/login", {
     method: "POST", body: JSON.stringify({ email, password }),
   }, false);
-  session.set(r.token, r.active_business_id);
+  const active = r.businesses?.find((b: any) => b.id === r.active_business_id) ?? r.businesses?.[0];
+  session.set(r.token, r.active_business_id ?? "");
+  if (active?.is_demo) {
+    if (!session.asOf) session.setAsOf("2026-11-07");
+  } else {
+    session.setAsOf(null);
+  }
+  return r;
+}
+
+export async function register(payload: {
+  email: string;
+  password: string;
+  full_name: string;
+  business_name: string;
+  industry: string;
+  city?: string;
+  opening_balance_paise?: number;
+  safety_buffer_paise?: number;
+}) {
+  const r = await request<any>("/api/auth/register", {
+    method: "POST",
+    body: JSON.stringify(payload),
+  }, false);
+  session.set(r.token, r.active_business_id ?? "");
+  session.setAsOf(null);
   return r;
 }
