@@ -398,10 +398,8 @@ decision per technique.
 | **TypeScript 5.7** | Strict. The production build type-checks and fails on an error — `ignoreBuildErrors` is **off**. |
 | **Tailwind CSS v4** | Design tokens as CSS custom properties, so light and dark are one token set rather than two stylesheets. The values are the literal hex from `DESIGN.md` (see *Design system* below) rather than computed OKLCH, because a design system a human maintains should be greppable against the document it came from. |
 | **Motion** (Framer Motion 12) | Component-level transitions: page changes, the sliding nav indicator, expanding evidence panels, staggered reveals. One animation runtime inside the app bundle. |
-| **GSAP + ScrollTrigger** | Scroll-linked work on the marketing surface: the pinned three-state card cycle and the pinned decision scrollytelling. Lenis is driven *from* `gsap.ticker` rather than its own `requestAnimationFrame` loop — two clocks let Lenis move the scroll position in a frame ScrollTrigger has already measured, which makes a pinned section shiver. Pins are also re-measured on `document.fonts` `loadingdone`, since a late web font changes the laid-out height the pin's end was computed from. |
-| **Lenis** | Inertial smooth scrolling — **on the landing page only**. Hijacking scroll inside a financial table is hostile; people scan tables, they do not glide through them. |
-| **three.js + @react-three/fiber + drei** | The landing hero: three refracting glass panels over two layers of lit bars, `MeshTransmissionMaterial` for real transmission and chromatic aberration. Loaded `ssr: false` behind a static CSS fallback, paused via IntersectionObserver when off-screen, and skipped entirely on a coarse pointer, ≤4 cores, <820px or `saveData`. Chosen over a generated GLB (Meshy and similar): ~8KB of code against a multi-MB static mesh, and it responds to scroll and pointer, which a baked mesh cannot. |
-| **Recharts** | The uncertainty-band chart, flow bars, ageing, concentration, the health gauge, sparklines and the customer risk scatter. Composable enough to draw a P10–P90 band as a real area between two series. |
+| **GSAP + ScrollTrigger / Lenis / three.js** | The v1 WebGL hero, intro curtain, chapter rail and tilt/magnetic primitives were **deleted** in the Grove v3 follow-up — no 3D glass, no dark stacked panels, no pinned scrollytelling, anywhere in the app. The landing is deliberately calm: Motion entrance reveals, one CSS marquee, one interactive lever and the real product frame. A financial product earns trust by being still enough to read. |
+| **Recharts** | The uncertainty-band chart, flow bars, ageing, concentration, the health gauge, sparklines and the customer risk scatter. Composable enough to draw a P10–P90 band as a real area between two series. The landing hero mounts the same `CashBandChart` as the app. |
 | **lucide-react** | Icons. |
 | **clsx + tailwind-merge** | Conditional classes without specificity fights. |
 
@@ -415,62 +413,74 @@ unreadable at exactly the moment it matters).
 
 **React Bits** was evaluated as the user suggested. Its value is copy-paste motion
 components, and the three that fit here — a scroll reveal, a text reveal and a
-pointer spotlight — are implemented directly in `components/runway/motion.tsx` in
-about 120 lines, with `prefers-reduced-motion` honoured in JavaScript (which also
-disables Lenis and the GSAP ticker, not just the CSS). Taking the dependency would
-have added weight without adding behaviour.
+pointer spotlight — were implemented directly in `components/runway/motion.tsx`
+in about 120 lines, with `prefers-reduced-motion` honoured in JavaScript. They
+remain available as optional primitives. The Grove landing now uses only the
+lighter `Reveal`, `Counter` and `Marquee` helpers; taking the dependency would
+still have added weight without adding behaviour.
 
 ---
 
 ## Design system
 
 `DESIGN.md` at the repository root is the single source for colour, type and
-spacing. It is Linear's structure with the accent replaced by lime `#C6F54A`,
-and it records its two deliberate departures from that structure rather than
-leaving them to be rediscovered:
+spacing. **v3 is RUNWAY / Grove**: the user's Google Drive UI reference applied
+in place to the landing page, sign-in, app shell and all 21 authenticated
+screens — warm paper `#f6f4ee`, deep ink `#10201a`, forest `#0c3b2a`, one lime
+`#d3f26b` accent, Plus Jakarta Sans with Instrument Serif italics, pill buttons,
+20px white cards and quiet hairline tables. Light is the default; dark is a
+complete companion. The reference is analysed in
+[`docs/DRIVE_REFERENCE.md`](docs/DRIVE_REFERENCE.md); the earlier research, three
+supplied templates and fifteen web sources are recorded (as v2 history) in
+[`docs/DESIGN_RESEARCH.md`](docs/DESIGN_RESEARCH.md).
 
-1. **Lime, not lavender.** The reference boards this was designed against are
-   green, and violet reads as a default.
-2. **A semantic set exists at all.** Linear has no "good" and "bad" colour. A
-   financial product must distinguish a gain from a loss, so `semantic-gain`,
-   `semantic-loss` and `semantic-warn` are defined — each one always paired
-   with a glyph, never carried by colour alone.
+The rules that survived from v1 are the ones that matter to money:
 
-The accent is reserved for brand, CTA and focus. It never means "good". The
-three states have their own fixed channel — ACTUAL cyan and solid, PREDICTED
-lime as a band, SIMULATED amber and dashed — which is why the accent cannot
-also be a verdict.
+1. **One accent, never a verdict.** Lime `#D3F26B` is for the brand mark,
+   CTA fills, active icons and focus. Forest `#0C3B2A` is the primary surface.
+   Neither ever means "good".
+2. **Semantic colour is never alone.** Gain, loss, warning and info are always
+   paired with a glyph, sign or word (WCAG 1.4.1).
+3. **Three states, two channels.** ACTUAL is a solid blue line, PREDICTED is a
+   forest P10–P90 band, SIMULATED is a dashed amber line. They are never summed
+   into one total.
+4. **The product is the protagonist.** The landing hero and `#product` section
+   mount the same `Stat`, `Panel`, `StateBadge`, `CashBandChart`, `BreachBars`
+   and `HealthGauge` components the application mounts, against the demo
+   tenant's figures. If a chart regresses in the app, it regresses on the
+   landing page too.
 
-The system's central rule is that **real product UI is the protagonist**. The
-landing page's `#product` section is not a screenshot: it mounts the same
-`Stat`, `Panel`, `StateBadge`, `CashBandChart`, `BreachBars` and `HealthGauge`
-the application mounts, against the demo tenant's figures, with three working
-levers that redraw all three states in one frame. If a chart regresses in the
-app it regresses on the landing page too.
+What v3 adds: the Drive reference's Plus Jakarta Sans display face with
+Instrument Serif italics, pill buttons, 20px white cards, a paper 264px rail
+with forest active states, a rounded-full command search, self-hosted fonts, and
+one shared route context across all twenty-one screens. The earlier editorial
+serif-everywhere treatment, deep-ink rail and chartreuse accent are preserved in
+Git history.
 
-Attribution: the analysis `DESIGN.md` was derived from is
-[VoltAgent/awesome-design-md](https://github.com/VoltAgent/awesome-design-md) (MIT).
+No reference asset, testimonial, pricing claim or layout is reproduced verbatim.
+The previous dark-lime/Linear-derived and v2 Atelier systems are preserved in Git
+history.
 
-## The premium layer
+## The motion layer
 
-Scroll and motion work, and what each piece is for. Everything here collapses
-to nothing under `prefers-reduced-motion`, and none of it is load-bearing —
-delete the block from `globals.css` and every screen still reads correctly.
+Everything here collapses to nothing under `prefers-reduced-motion`, and none of
+it is load-bearing — delete the block from `globals.css` and every screen still
+reads correctly.
 
 | Piece | Where | What it does |
 |---|---|---|
-| `rw-stage` cascade | all 21 app screens + the shared report | A CSS `nth-child` cascade on the route wrapper's grandchildren, so a screen *assembles* instead of appearing. Keyed in CSS rather than per-page code, which is why 20 screens inherited it without a line of edits. Delays flatten after the eighth child — nobody should wait on decoration. |
+| `rw-stage` cascade | all 21 app screens + the shared report | A CSS `nth-child` cascade on the route wrapper's grandchildren, so a screen *assembles* instead of appearing. Keyed in CSS rather than per-page code. Delays flatten after the eighth child — nobody should wait on decoration. |
 | `rw-route-bar` | app shell | A one-sweep progress bar, remounted on each navigation so it cannot get stuck. A navigation that recomputes a forecast is not instant; saying so beats a frozen screen. |
-| `IntroCurtain` | landing | One brand beat on first arrival, gated on `sessionStorage` so returning from `/login` does not replay it. Painted *over* an already-rendered page and removed by a timer that cannot fail to a blank screen. |
-| `ChapterRail` | landing | A fixed section index that tracks the scroll. It picks the section with the largest visible share rather than firing on the last boundary crossed — the naive version flickers between two short adjacent sections. Every dot is a real anchor. |
-| `hero3d` | landing, login | Refracting glass panels over lit bars. Capability-gated and paused off-screen. |
-| GSAP pins | landing | The three-state card cycle and the decision scrollytelling, both driven from the unified Lenis/GSAP ticker. |
-| Print stylesheet | shared report | A passport gets printed and filed by a lender, so print forces the light ladder, drops the chrome and keeps panels off page breaks. |
+| `Reveal` | landing, app | One 0.5s ease-out entrance per section. No pinned scroll, no parallax, no scroll hijacking. |
+| `Marquee` | landing | A single slow ticker of the demo ledger's real figures, masked at both edges. |
+| Decision lever | landing | One interactive SVG path that redraws when the visitor negotiates a 30% advance. The only animated financial comparison on the page is a static teaching example, never a live balance. |
+| Print stylesheet | shared report | A passport gets printed and filed by a lender, so print forces the paper ladder, drops the chrome and keeps panels off page breaks. |
 
-The marketing motion components in `components/runway/bits.tsx` — magnetic
-buttons, scrambling counters, tilt cards — are **not used anywhere inside the
-application**, by rule. A scrambling number is delightful on a landing page and
-hostile next to someone's bank balance.
+The heavier v1 primitives — `IntroCurtain`, `ChapterRail`, `hero3d`, magnetic
+buttons, tilt cards and GSAP pins — were **removed from the repository** in v3.
+Nothing dark, tilted, glassy or WebGL-rendered can appear on any route now. A
+scrambling number is delightful on a landing page and hostile next to someone's
+bank balance.
 
 ---
 
@@ -500,7 +510,7 @@ INNOVASIA/
 │   ├── app/                      21 routes
 │   ├── components/runway/        shell, primitives, charts, motion
 │   ├── lib/                      api client, formatting, hooks
-│   └── tests/                    75 frontend tests
+│   └── tests/                    95 frontend tests
 │       ├── migrations/           Alembic revisions
 │       └── seed/                 synthetic MSME generator, 5 scenarios
 ├── tests/                        211 backend tests across 9 files

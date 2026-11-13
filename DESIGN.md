@@ -1,210 +1,149 @@
 ---
-version: 1
-name: RUNWAY-design-system
-base: linear.app
-description: "RUNWAY's design language. Linear's structure — a near-black canvas, a four-step surface ladder, hairline borders instead of shadows, one chromatic accent used scarcely, aggressively negative display tracking, and real product UI as the protagonist of every section — with the accent moved from Linear's lavender-blue to a lime-chartreuse, and a small, strictly semantic colour set added because a financial product must distinguish gain from loss. Derived from the Linear analysis in VoltAgent/awesome-design-md (MIT). Design language only: no Linear mark, copy or asset is reproduced."
-
-colors:
-  # Brand and interaction. Never means "good".
-  primary: "#C6F54A"
-  on-primary: "#0D1A10"
-  primary-hover: "#D4FA6E"
-  primary-focus: "#B3E634"
-  primary-soft: "rgba(198, 245, 74, 0.13)"
-
-  ink: "#F4F8F5"
-  ink-muted: "#CBD6CE"
-  ink-subtle: "#8A978E"
-  ink-tertiary: "#64706A"
-
-  # Four-step surface ladder. Hierarchy comes from these, not from shadow.
-  canvas: "#06100B"
-  surface-1: "#0F1613"
-  surface-2: "#141D19"
-  surface-3: "#19241F"
-  surface-4: "#1D2A24"
-
-  hairline: "#1E2A24"
-  hairline-strong: "#2B3A32"
-  hairline-tertiary: "#3A4C42"
-
-  # Semantic only. Never a background, never decoration, always paired
-  # with a glyph or a sign so colour is never the sole channel.
-  semantic-gain: "#34E7B0"
-  semantic-loss: "#FF6B7A"
-  semantic-warn: "#F5C45E"
-  semantic-info: "#6FC8F5"
-
-  # The three states. Three hue families AND three line treatments.
-  state-actual: "#6FC8F5"
-  state-predicted: "#C6F54A"
-  state-simulated: "#F5C45E"
-
-typography:
-  display-xl: { fontFamily: Sora, fontSize: 80px, fontWeight: 600, lineHeight: 1.04, letterSpacing: -3.0px }
-  display-lg: { fontFamily: Sora, fontSize: 56px, fontWeight: 600, lineHeight: 1.08, letterSpacing: -1.8px }
-  display-md: { fontFamily: Sora, fontSize: 40px, fontWeight: 600, lineHeight: 1.14, letterSpacing: -1.0px }
-  headline:   { fontFamily: Sora, fontSize: 28px, fontWeight: 600, lineHeight: 1.20, letterSpacing: -0.6px }
-  card-title: { fontFamily: Sora, fontSize: 20px, fontWeight: 600, lineHeight: 1.25, letterSpacing: -0.4px }
-  body-lg:    { fontFamily: Inter, fontSize: 17px, fontWeight: 400, lineHeight: 1.55, letterSpacing: -0.1px }
-  body:       { fontFamily: Inter, fontSize: 15px, fontWeight: 400, lineHeight: 1.55 }
-  small:      { fontFamily: Inter, fontSize: 13px, fontWeight: 400, lineHeight: 1.5 }
-  label:      { fontFamily: Inter, fontSize: 11px, fontWeight: 600, lineHeight: 1.2, letterSpacing: 0.18em, textTransform: uppercase }
-  numeric:    { fontFamily: Inter, fontVariantNumeric: tabular-nums }
-  mono:       { fontFamily: JetBrains Mono, fontSize: 12px, fontWeight: 400 }
-
-rounded:
-  xs: 4px
-  sm: 6px
-  md: 8px
-  lg: 12px
-  xl: 16px
-  xxl: 24px
-  pill: 9999px
-
-spacing:
-  xxs: 4px
-  xs: 8px
-  sm: 12px
-  md: 16px
-  lg: 24px
-  xl: 32px
-  xxl: 48px
-  section: 96px
+version: 3
+name: RUNWAY-Grove
+base: the user's Google Drive `redesign-fintech-app-ui` reference
+description: "RUNWAY's design language after the 2026-11-13 follow-up. Warm paper, deep ink, forest green, one lime accent, Plus Jakarta Sans with Instrument Serif italics, pill buttons, 20px white cards and quiet hairline tables — applied in place to the landing page, sign-in, app shell and all 21 authenticated screens. Light is the default; dark is a companion. Three-state semantics, provenance, accessibility and honesty rules are unchanged. Research: docs/DESIGN_RESEARCH.md. Reference analysis: docs/DRIVE_REFERENCE.md."
+supersedes: RUNWAY-Atelier v2 (editorial ivory + ink / electric chartreuse)
 ---
+
+# RUNWAY / Grove
 
 ## Overview
 
-The canvas is `#06100B` — near-black with a faint green cast, the same move Linear
-makes with blue. On top sits a four-step surface ladder for cards, panels and lifted
-tiles, with hairline borders rather than drop shadows. Light text carries everything.
+RUNWAY is a financial intelligence layer for Indian MSMEs. It reports money, so
+the interface has one job: make reality, expectation and possibility impossible
+to confuse while staying calm enough to read at 7 a.m. before a payment run.
 
-The single chromatic accent is **lime-chartreuse `#C6F54A`**, used on the brand mark,
-the primary CTA and the focus ring. Nowhere else.
+The **v3 visual source of truth is the user's Google Drive reference**
+(`redesign-fintech-app-ui`). The `runway_ui` tile the user shared is an empty
+folder; the project beside it contains the full Next.js UI. Its design language
+is now applied **everywhere**: marketing, sign-in, app shell, shared report and
+all 21 authenticated screens. The user explicitly chose “Apply it everywhere”
+over a blend or app-only change.
 
-The page rhythm is **real product UI**. RUNWAY has twenty-one working screens; the
-marketing chrome exists to frame them, not to compete with them.
+What survives from Atelier v2: warm paper, deep ink, real product UI as the
+protagonist, one restrained accent, hairlines over shadows, tabular numerals,
+and the three-state/provenance/accessibility contracts. What changes: forest
+green replaces olive as the primary, the reference lime replaces electric
+chartreuse, Plus Jakarta Sans replaces Inter/Sora, the ink rail becomes a paper
+rail with forest active states, and the component vocabulary becomes pills,
+20px cards, `.tbl` tables and `.field` inputs.
 
-**Key characteristics**
+## Palette
 
-- Dark-canvas system. `#06100B` is the anchor; `#000000` is never used.
-- One chromatic accent, used scarcely.
-- A four-step surface ladder carries hierarchy without shadow.
-- Display tracking pulls hard negative (−3.0px at 80px); body holds near 0.
-- Cards are 12px with a 1px hairline. Product panels are 16px.
-- No atmospheric gradients and no spotlight cards **inside the application**.
-
-## Two deliberate deviations from Linear
-
-**1 · The accent is lime, not lavender.** Linear's `#5e6ad2` is a lavender-blue. It is
-wrong here for three reasons: the brief's references are green-on-black throughout;
-green is the convention a financial audience already reads; and violet is explicitly
-ruled out for a page's own design by the house frontend rules. Linear's *discipline*
-about the accent is kept exactly — one hue, used on brand, CTA and focus only.
-
-**2 · A semantic set exists.** Linear says "don't introduce a second chromatic accent."
-A product that reports money cannot honour that literally: gain, loss and warning must
-be separable at a glance. So four semantic hues exist under a hard constraint:
-
-> A semantic colour may only carry financial meaning. It is never a background, never
-> a decoration, never a brand surface, and it always appears with a glyph or a sign, so
-> colour is never the only channel. `gain` sits at hue 168 against the accent's 128 —
-> far enough apart that a primary button and a healthy metric never read alike.
-
-## Colours
-
-| Role | Token | Rule |
+| Role | Value | Rule |
 |---|---|---|
-| Brand, CTA, focus | `primary` `#C6F54A` | Interaction only. Never means "good". |
-| Canvas | `canvas` `#06100B` | The anchor. Never `#000`. |
-| Cards | `surface-1` `#0F1613` | Default lift. |
-| Lifted / hover | `surface-2` `#141D19` | Hovered and featured cards. |
-| Menus | `surface-3` `#19241F` | Dropdowns, popovers. |
-| Borders | `hairline` `#1E2A24` | 1px. Carries depth in place of shadow. |
-| Gain | `semantic-gain` `#34E7B0` | Semantic only, with a glyph. |
-| Loss | `semantic-loss` `#FF6B7A` | Semantic only, with a glyph. |
-| Warning | `semantic-warn` `#F5C45E` | Semantic only. |
+| Paper canvas | `#f6f4ee` | Warm off-white. Never pure white for the page. |
+| Paper 2 | `#efece3` | Subtle inset surfaces, table row hover. |
+| Card | `#ffffff` | The only true white. 20px radius, 1px `--line` border. |
+| Ink | `#10201a` | All primary type. |
+| Ink 2 / 3 | `#46544d` / `#7b8780` | Secondary copy / labels and ticks. |
+| Line / Line 2 | `#e6e2d7` / `#d6d1c3` | Hairlines; line 2 for input borders. |
+| Forest | `#0c3b2a` | Primary buttons, active nav, inverse story panels, brand tile. |
+| Forest 2 / 3 | `#14563d` / `#1d6f50` | Hover, eyebrow, chart series. |
+| Lime | `#d3f26b` | The one accent: CTA fills, active icons, brand arrow, selection. |
+| Lime 2 | `#bfe24a` | Lime hover. |
+| Sage | `#e7eee1` | Quiet tinted panels, demo-account card, icon tiles. |
+| Gain / Loss / Warn / Sky | `#0f8a5f` / `#c93b2b` / `#b7791f` / `#2f6da8` | Financial meaning only, never decoration. |
 
-The three states each take a hue **and** a line treatment: actual is solid cyan,
-predicted is lime with an uncertainty band, simulated is dashed amber. Printed in
-greyscale, or seen by someone with deuteranopia, the three stay distinguishable.
+Semantic colours are always paired with a word or glyph. The three states are
+separated by **hue AND line treatment**: Actual = blue solid line, Predicted =
+forest line with a P10–P90 band, Simulated = amber dashed line. Colour is never
+the only channel.
 
 ## Typography
 
-Display is **Sora** at 600, tracking from −3.0px at 80px to −0.4px at 20px. Body is
-**Inter** at 400. Technical strings — invoice numbers, references, ledger fingerprints
-— are **JetBrains Mono**.
+- **Plus Jakarta Sans** for everything: 400/500/600/700/800. Display headings
+  are 600, `letter-spacing: -0.035em`, `line-height: 1.04`, `text-wrap: balance`.
+  All three families are self-hosted in `frontend/public/fonts/` (fontsource
+  woff2), matching the Drive reference without a third-party font request.
+- **Instrument Serif italic** is reserved for one emphasised word inside a
+  display headline (`<em>`, `.serif-i`, `.display em`).
+- **JetBrains Mono** for fingerprints, seeds, keyboard hints and the tiny
+  provenance metadata only.
+- `font-feature-settings: 'cv11', 'ss01'`; all numbers use tabular figures via
+  `.num` / `.tnum`.
 
-`font-variant-numeric: tabular-nums` applies to every element that can show a changing
-number. Without it a refresh makes the layout twitch, which reads as instability in a
-product whose job is to look trustworthy.
+## Component vocabulary
 
-Display never exceeds 600. Headings are sentence case, never all-caps; the only
-uppercase is the `label` style at 11px with wide tracking.
+Defined in `frontend/app/globals.css`, matching the reference file of the same
+name:
+
+| Class | Purpose |
+|---|---|
+| `.card` / `.card-flat` | 20px / 14px white card with a 1px hairline. |
+| `.btn`, `.btn-primary`, `.btn-lime`, `.btn-ghost`, `.btn-sm` | 44px pill buttons; forest, lime, outline. |
+| `.pill`, `.pill-gain/loss/warn/sky` | Rounded status pills. |
+| `.tbl` | Quiet data table: 12px uppercase-ish headers, 14px rows, hover tint. |
+| `.field` / `.label` | 46px rounded inputs. |
+| `.display`, `.serif-i`, `.eyebrow`, `.num` | Headline, italic accent, 12px forest eyebrow, tabular numbers. |
+| `.dots`, `.grain`, `.rise`, `.float`, `.marquee`, `.no-print` | Marketing texture and reduced-motion-aware animation. |
+
+Compatibility aliases (`.rw-card`, `.rw-chip`, `.atelier-*`, `.font-editorial`)
+map the existing 21 screens onto the same vocabulary without a per-page rewrite.
+`.font-editorial` is now the tight sans display; its `<em>` children remain
+serif italic. `.rw-sidebar` is the forest inverse scope used by story panels,
+not the app rail.
 
 ## Layout
 
-- Base unit 4px; section rhythm 96px.
-- Max content width 1280px (1600px for dense application tables).
-- Card grids 3-up desktop, 2-up tablet, 1-up mobile.
-- Product panels span the full content width. They are the protagonist.
-- The dark canvas *is* the whitespace. Sections separate by lifting onto a surface,
-  not by gaps.
+- **Marketing**: sticky 72px paper header, centred hero with a lime “New” pill,
+  `display` headline with a serif italic word, two pill CTAs, then a real
+  product frame (`CashBandChart`, `Stat`, `StateBadge`, `Evidence`). Marquee,
+  idea cards, forest proof panels, FAQ and a full-width lime closing CTA.
+- **Sign-in**: paper form on the left (`.field`, forest `.btn-primary`, sage demo
+  card), forest dotted story panel on the right with a lime mini-chart.
+- **App shell**: 264px paper rail, white business switcher, uppercase group
+  labels, forest active nav with lime icons, sticky paper header with a
+  rounded-full search, as-of pill, theme toggle and “Ask a question” forest
+  button. Main content is centred at 1180px.
+- **App pages**: `PageHeader`-style section headings, `card` panels, four KPI
+  tiles, charts, hairline lists and a data-quality footer. 21 routes inherit
+  the shell and primitives.
+- **Shared passport**: the same cards, forced to white for print, with all
+  chrome removed.
 
-## Elevation
+## Themes, motion and accessibility
 
-| Level | Treatment | Use |
-|---|---|---|
-| 0 | No border, no shadow | Body type, hero text, footer |
-| 1 | `surface-1` + 1px `hairline` | Default cards, product panels |
-| 2 | `surface-2` + 1px `hairline-strong` | Hovered and featured cards |
-| 3 | `surface-3` | Dropdowns, popovers, command palette |
-| 4 | 2px `primary-focus` outline | Focus |
+- Light is the default; `data-theme="dark"` is an explicit companion with the
+  same forest/lime identity on a deep green-black canvas. The boot script sets
+  it before first paint.
+- Motion is entrance reveals, a marquee, one floating note and an interactive
+  lever. Every animation is disabled under `prefers-reduced-motion`. The v1
+  WebGL hero, intro curtain, chapter rail and tilt/magnetic primitives were
+  deleted in v3 — no route can render a dark 3D glass panel.
+- Focus rings use forest-3 at 2px/2px. Contrast on paper is ≥4.5:1 for body
+  copy. Charts carry `role="img"`, aria labels, tooltips with full grouped
+  rupees and a labelled safety-buffer reference line.
+- Print forces a white paper ladder and hides navigation, noise and route bars.
 
-Depth is the surface ladder plus hairlines. Drop shadows are resisted almost entirely;
-a faint top-edge highlight on a lifted panel is the one exception.
+## Product invariants (unchanged)
 
-## Shapes
+- Actual, predicted and simulated are stored, versioned and labelled separately.
+- A funding-gap answer is shown when asked; forecasts carry sample size, seed,
+  horizon and conformal coverage.
+- The Copilot refuses unmeasured or unsourced questions and shows its evidence.
+- RUNWAY never moves money, never promises loan approval, never claims an
+  unmeasured accuracy, never treats health as a credit score and never sells
+  data. Simulations are structurally isolated from the ledger.
+- No invented testimonials, pricing claims or stock photography. All demo
+  figures come from the synthetic seeded ledger.
 
-4px chips · 6px tags · 8px buttons and inputs · 12px cards · 16px product panels ·
-pill for status only. Buttons are 8px — never pill-rounded.
+## Implementation map
 
-## Marketing surface
-
-The landing page may use what the application may not: a WebGL hero, scroll-linked
-storytelling, an aurora wash, a grid with light beams. These are confined to the
-marketing route. Inside the application the rule is Linear's — flat surfaces, hairlines,
-and the product doing the talking.
-
-One further constraint, specific to this product: **never animate a live financial
-figure.** An animating balance is unreadable at exactly the moment it matters. Counters
-exist, and they run on the landing page's static statistics only.
-
-## Do's and Don'ts
-
-### Do
-- Keep `canvas` as the anchor. The green cast is intentional.
-- Use `primary` only for brand mark, primary CTA, focus ring and link emphasis.
-- Use the surface ladder for hierarchy; do not skip levels.
-- Pair display 600 with body 400.
-- Apply negative tracking aggressively on display.
-- Let real product UI be the protagonist of every marketing section.
-- Pair every semantic colour with a glyph or a sign.
-
-### Don't
-- Don't ship a light-mode marketing page. (The *application* has a light theme; the
-  marketing surface does not.)
-- Don't use lime as a section background or card fill.
-- Don't use a semantic colour decoratively.
-- Don't introduce violet or lavender anywhere in the page's own design.
-- Don't use atmospheric gradients or spotlight cards inside the application.
-- Don't pill-round a button.
-- Don't use `#000000` as the canvas.
-- Don't promote display type past weight 600.
-
-## Attribution
-
-Structure adapted from the Linear analysis in
-[VoltAgent/awesome-design-md](https://github.com/VoltAgent/awesome-design-md) (MIT),
-an inspired-by analysis of design language. No Linear trademark, logo, copy or asset
-is reproduced, and this is not intended to pass as Linear's work.
+| Concern | File |
+|---|---|
+| Tokens, reference classes, aliases, print/motion | `frontend/app/globals.css` |
+| Fonts, metadata, theme boot | `frontend/app/layout.tsx` |
+| Brand mark | `frontend/components/runway/brand.tsx`, `frontend/public/favicon.svg` |
+| Marketing surface | `frontend/components/runway/atelier.tsx` |
+| Real product frame | `frontend/components/runway/product-preview.tsx` |
+| App shell, command palette, business switcher | `frontend/components/runway/shell.tsx` |
+| Shared primitives (Stat, Panel, SectionHeader, badges, states) | `frontend/components/runway/primitives.tsx` |
+| Charts and three-state line treatments | `frontend/components/runway/charts.tsx` |
+| Dashboard | `frontend/app/app/page.tsx` |
+| Sign-in | `frontend/app/login/page.tsx` |
+| 20 other authenticated screens | `frontend/app/app/*/page.tsx` |
+| Shared passport | `frontend/app/shared/[token]/page.tsx` |
+| Reference analysis | `docs/DRIVE_REFERENCE.md` |
+| Earlier research (historical) | `docs/DESIGN_RESEARCH.md`, `docs/REFERENCE_ANALYSIS.md` |

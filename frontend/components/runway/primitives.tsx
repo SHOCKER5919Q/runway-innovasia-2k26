@@ -13,13 +13,13 @@ export function StateBadge({ state, size = "sm", withBlurb = false }:
   if (!meta) return null;
   return (
     <span
-      className={cn("rw-chip", size === "md" && "px-3 py-1.5 text-xs")}
+      className={cn("pill", size === "md" && "px-3 py-1.5 text-xs")}
       style={{ color: meta.color, background: meta.soft, borderColor: meta.soft }}
       title={meta.blurb}
     >
       <span aria-hidden className="inline-block size-1.5 rounded-full" style={{ background: meta.color }} />
       {meta.label}
-      {withBlurb && <span className="text-muted-foreground font-normal"> · {meta.blurb}</span>}
+      {withBlurb && <span className="font-normal text-ink-2"> · {meta.blurb}</span>}
     </span>
   );
 }
@@ -32,7 +32,7 @@ export function Delta({ value, suffix = "", betterWhen = "higher", className }:
   const Icon = value === 0 ? Minus : value > 0 ? ArrowUpRight : ArrowDownRight;
   const tone = good === null ? "neutral" : good ? "gain" : "loss";
   return (
-    <span className={cn("inline-flex items-center gap-0.5 text-xs font-medium tnum",
+    <span className={cn("inline-flex items-center gap-0.5 text-xs font-semibold tnum",
       TONE_CLASS[tone], className)}>
       <Icon className="size-3.5" aria-hidden />
       {Math.abs(value).toLocaleString("en-IN", { maximumFractionDigits: 2 })}{suffix}
@@ -57,40 +57,31 @@ export function Stat({
       onClick={onClick}
       title={hint}
       className={cn(
-        "rw-card group relative overflow-hidden p-4 text-left duration-300",
-        "transition-[border-color,background-color,transform,box-shadow]",
-        "hover:border-border-strong",
-        onClick && "hover:bg-surface-hover focus-visible:bg-surface-hover cursor-pointer",
+        "card group relative p-5 text-left transition-[border-color,background-color,transform]",
+        "hover:border-line-2",
+        onClick && "cursor-pointer hover:bg-paper-2 focus-visible:bg-paper-2",
         className)}
     >
-      {/* A tinted top edge keyed to the tile's tone — the glow line in the
-          reference boards. Decorative, and never the only cue. */}
-      <span aria-hidden className={cn(
-        "pointer-events-none absolute inset-x-0 top-0 h-px opacity-0 transition-opacity duration-300 group-hover:opacity-100",
-        tone === "gain" ? "bg-fin-gain" : tone === "loss" ? "bg-fin-loss"
-          : tone === "warn" ? "bg-fin-warn" : "bg-primary")} />
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
           <div className="flex items-center gap-1.5">
-            <p className="truncate text-[11px] font-medium uppercase tracking-wider text-muted-foreground">
-              {label}
-            </p>
-            {hint && <Info className="size-3 shrink-0 text-muted-foreground/60" aria-hidden />}
+            <p className="truncate text-[13px] font-medium text-ink-3">{label}</p>
+            {hint && <Info className="size-3 shrink-0 text-ink-3/70" aria-hidden />}
           </div>
-          <p className={cn("mt-1.5 font-display text-2xl font-semibold tracking-tight tnum",
+          <p className={cn("num mt-2 text-[28px] font-semibold leading-none tracking-[-0.03em]",
             TONE_CLASS[tone])}>
             {value}
           </p>
-          {sub && <div className="mt-1 text-xs text-muted-foreground">{sub}</div>}
+          {sub && <div className="mt-2.5 text-[13px] leading-snug text-ink-2">{sub}</div>}
         </div>
         {icon && (
-          <span className="grid size-9 shrink-0 place-items-center rounded-lg border border-border bg-surface text-muted-foreground">
+          <span className="grid size-12 shrink-0 place-items-center rounded-2xl bg-sage text-forest">
             {icon}
           </span>
         )}
       </div>
       {(state || footer) && (
-        <div className="mt-3 flex items-center justify-between gap-2 border-t border-border pt-2.5">
+        <div className="mt-4 flex items-center justify-between gap-2 border-t border-line pt-3">
           {state ? <StateBadge state={state} /> : <span />}
           {footer}
         </div>
@@ -99,16 +90,16 @@ export function Stat({
   );
 }
 
-/* ── section header ──────────────────────────────────────────── */
+/* ── page / section header ───────────────────────────────────── */
 
 export function SectionHeader({ title, description, actions, id }:
   { title: string; description?: ReactNode; actions?: ReactNode; id?: string }) {
   return (
-    <div id={id} className="mb-4 flex flex-wrap items-end justify-between gap-3">
-      <div className="min-w-0">
-        <h2 className="font-display text-lg font-semibold tracking-tight">{title}</h2>
+    <div id={id} className="mb-7 flex flex-wrap items-end justify-between gap-4">
+      <div className="max-w-2xl">
+        <h1 className="display text-[28px] leading-tight sm:text-[32px]">{title}</h1>
         {description && (
-          <p className="mt-0.5 max-w-3xl text-sm text-muted-foreground text-pretty">{description}</p>
+          <p className="mt-1.5 text-[15px] leading-relaxed text-ink-2 text-pretty">{description}</p>
         )}
       </div>
       {actions && <div className="flex shrink-0 items-center gap-2">{actions}</div>}
@@ -120,19 +111,19 @@ export function Panel({ title, description, actions, children, className, bodyCl
   { title?: string; description?: ReactNode; actions?: ReactNode; children: ReactNode;
     className?: string; bodyClass?: string; id?: string }) {
   return (
-    <section id={id} className={cn("rw-card flex flex-col overflow-hidden", className)}>
+    <section id={id} className={cn("card flex flex-col overflow-hidden", className)}>
       {(title || actions) && (
-        <header className="flex flex-wrap items-start justify-between gap-3 border-b border-border px-4 py-3">
+        <header className="flex flex-wrap items-start justify-between gap-4 px-6 pt-5">
           <div className="min-w-0">
-            {title && <h3 className="font-display text-sm font-semibold tracking-tight">{title}</h3>}
+            {title && <h2 className="text-[17px] font-semibold tracking-tight">{title}</h2>}
             {description && (
-              <p className="mt-0.5 max-w-2xl text-xs text-muted-foreground text-pretty">{description}</p>
+              <p className="mt-0.5 max-w-2xl text-sm text-ink-3 text-pretty">{description}</p>
             )}
           </div>
           {actions && <div className="flex shrink-0 items-center gap-2">{actions}</div>}
         </header>
       )}
-      <div className={cn("flex-1 p-4", bodyClass)}>{children}</div>
+      <div className={cn("flex-1 px-6 pb-6 pt-4", bodyClass)}>{children}</div>
     </section>
   );
 }
@@ -140,16 +131,16 @@ export function Panel({ title, description, actions, children, className, bodyCl
 /* ── level pill ──────────────────────────────────────────────── */
 
 const LEVEL_STYLE: Record<string, { cls: string; label: string }> = {
-  critical: { cls: "text-fin-loss bg-fin-loss-soft border-fin-loss/30", label: "Critical" },
-  warning: { cls: "text-fin-warn bg-fin-warn-soft border-fin-warn/30", label: "Warning" },
-  watch: { cls: "text-fin-info bg-fin-info-soft border-fin-info/30", label: "Watch" },
-  info: { cls: "text-muted-foreground bg-surface border-border", label: "Info" },
+  critical: { cls: "pill-loss", label: "Critical" },
+  warning: { cls: "pill-warn", label: "Warning" },
+  watch: { cls: "pill-sky", label: "Watch" },
+  info: { cls: "", label: "Info" },
 };
 
 export function LevelPill({ level }: { level: string }) {
   const s = LEVEL_STYLE[level] ?? LEVEL_STYLE.info;
   return (
-    <span className={cn("rw-chip uppercase tracking-wide", s.cls)}>
+    <span className={cn("pill uppercase tracking-wide", s.cls)}>
       {level === "critical" && <AlertTriangle className="size-3" aria-hidden />}
       {s.label}
     </span>
@@ -158,13 +149,10 @@ export function LevelPill({ level }: { level: string }) {
 
 export function RiskBand({ band }: { band: string }) {
   const map: Record<string, string> = {
-    low: "text-fin-gain bg-fin-gain-soft border-fin-gain/30",
-    medium: "text-fin-warn bg-fin-warn-soft border-fin-warn/30",
-    high: "text-fin-loss bg-fin-loss-soft border-fin-loss/30",
-    critical: "text-fin-loss bg-fin-loss-soft border-fin-loss/50 font-semibold",
-    unknown: "text-muted-foreground bg-surface border-border",
+    low: "pill-gain", medium: "pill-warn", high: "pill-loss",
+    critical: "pill-loss font-semibold", unknown: "",
   };
-  return <span className={cn("rw-chip capitalize", map[band] ?? map.unknown)}>{band}</span>;
+  return <span className={cn("pill capitalize", map[band] ?? map.unknown)}>{band}</span>;
 }
 
 /* ── evidence list ───────────────────────────────────────────── */
@@ -175,8 +163,8 @@ export function Evidence({ items, dense = false }:
   return (
     <dl className={cn("grid gap-x-4 gap-y-1.5", dense ? "text-xs" : "text-sm")}>
       {items.map((e, i) => (
-        <div key={i} className="flex items-start justify-between gap-4 border-b border-border/60 pb-1.5 last:border-0">
-          <dt className="shrink-0 text-muted-foreground">{e.label}</dt>
+        <div key={i} className="flex items-start justify-between gap-4 border-b border-line/70 pb-1.5 last:border-0">
+          <dt className="shrink-0 text-ink-3">{e.label}</dt>
           <dd className="min-w-0 text-right tnum">{e.value}</dd>
         </div>
       ))}
@@ -187,12 +175,12 @@ export function Evidence({ items, dense = false }:
 /* ── loading / empty / error ─────────────────────────────────── */
 
 export function Skeleton({ className }: { className?: string }) {
-  return <div className={cn("rw-shimmer rounded-md bg-surface", className)} />;
+  return <div className={cn("rw-shimmer rounded-xl bg-paper-2", className)} />;
 }
 
 export function LoadingPanel({ rows = 3, title }: { rows?: number; title?: string }) {
   return (
-    <div className="rw-card space-y-3 p-4" role="status" aria-live="polite">
+    <div className="card space-y-3 p-5" role="status" aria-live="polite">
       <span className="sr-only">{title ? `Loading ${title}` : "Loading"}</span>
       <Skeleton className="h-4 w-40" />
       {Array.from({ length: rows }).map((_, i) => (
@@ -205,11 +193,11 @@ export function LoadingPanel({ rows = 3, title }: { rows?: number; title?: strin
 export function EmptyState({ title, description, action, icon }:
   { title: string; description?: string; action?: ReactNode; icon?: ReactNode }) {
   return (
-    <div className="flex flex-col items-center justify-center gap-3 rounded-lg border border-dashed border-border px-6 py-12 text-center">
-      {icon && <span className="grid size-10 place-items-center rounded-full bg-surface text-muted-foreground">{icon}</span>}
+    <div className="flex flex-col items-center justify-center gap-3 rounded-2xl border border-dashed border-line bg-card px-6 py-14 text-center">
+      {icon && <span className="grid size-10 place-items-center rounded-full bg-paper-2 text-ink-3">{icon}</span>}
       <div>
-        <p className="font-medium">{title}</p>
-        {description && <p className="mx-auto mt-1 max-w-md text-sm text-muted-foreground text-pretty">{description}</p>}
+        <p className="font-semibold">{title}</p>
+        {description && <p className="mx-auto mt-1 max-w-md text-sm text-ink-3 text-pretty">{description}</p>}
       </div>
       {action}
     </div>
@@ -218,18 +206,15 @@ export function EmptyState({ title, description, action, icon }:
 
 export function ErrorState({ message, onRetry }: { message: string; onRetry?: () => void }) {
   return (
-    <div className="rw-card border-fin-loss/30 p-4" role="alert">
+    <div className="card border-loss/30 p-5" role="alert">
       <div className="flex items-start gap-3">
-        <AlertTriangle className="mt-0.5 size-4 shrink-0 text-fin-loss" aria-hidden />
+        <AlertTriangle className="mt-0.5 size-4 shrink-0 text-loss" aria-hidden />
         <div className="min-w-0 flex-1">
-          <p className="text-sm font-medium">Could not load this section</p>
-          <p className="mt-0.5 break-words text-xs text-muted-foreground">{message}</p>
+          <p className="text-sm font-semibold">Could not load this section</p>
+          <p className="mt-0.5 break-words text-xs text-ink-2">{message}</p>
         </div>
         {onRetry && (
-          <button onClick={onRetry}
-            className="shrink-0 rounded-md border border-border px-2.5 py-1 text-xs hover:bg-surface-hover">
-            Retry
-          </button>
+          <button onClick={onRetry} className="btn btn-ghost btn-sm shrink-0">Retry</button>
         )}
       </div>
     </div>
@@ -240,7 +225,7 @@ export function ErrorState({ message, onRetry }: { message: string; onRetry?: ()
 
 export function Provenance({ children }: { children: ReactNode }) {
   return (
-    <p className="mt-3 flex items-start gap-1.5 text-[11px] leading-relaxed text-muted-foreground">
+    <p className="mt-3 flex items-start gap-1.5 text-[11px] leading-relaxed text-ink-3">
       <Info className="mt-0.5 size-3 shrink-0" aria-hidden />
       <span className="text-pretty">{children}</span>
     </p>

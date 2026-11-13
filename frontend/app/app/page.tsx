@@ -1,7 +1,6 @@
 "use client";
 
 import Link from "next/link";
-import { useMemo } from "react";
 import {
   AlertTriangle, ArrowRight, CalendarClock, CircleDollarSign, Gauge,
   Landmark, Lightbulb, Receipt, Sparkles, TrendingUp, Wallet,
@@ -30,71 +29,88 @@ export default function HomePage() {
   const f = d.forecast;
 
   return (
-    <div className="space-y-6">
-      {/* ── briefing ── */}
+    <div className="space-y-7">
+      {/* ── overview masthead ── */}
       <Reveal>
-        <section className="rw-card relative overflow-hidden">
-          <div className="pointer-events-none absolute inset-0 rw-aurora opacity-60" aria-hidden />
-          <div className="relative p-5 sm:p-6">
-            <div className="flex flex-wrap items-start justify-between gap-4">
-              <div className="min-w-0">
-                <h1 className="font-display text-2xl font-semibold tracking-tight text-balance">
-                  {br.data?.greeting ?? "Your financial briefing"}
-                </h1>
-                <p className="mt-1 text-sm text-muted-foreground">
-                  {br.data?.subtitle ?? `Here is ${d.business.name} at a glance.`}
-                </p>
-              </div>
+        <section className="relative mb-1">
+          <div className="flex flex-wrap items-start justify-between gap-4">
+            <div className="min-w-0">
+              <p className="eyebrow">Overview · {d.business.name}</p>
+              <h1 className="display mt-2 text-[30px] leading-tight sm:text-[34px]">
+                {br.data?.greeting ?? "Your financial briefing"}
+              </h1>
+              <p className="mt-2 max-w-2xl text-[16px] leading-relaxed text-ink-2">
+                {br.data?.subtitle ?? `Here is ${d.business.name} at a glance.`}
+              </p>
+            </div>
+            <div className="flex flex-wrap items-center gap-2 pt-1">
+              <span className="pill border border-line bg-card text-ink-2">
+                <CalendarClock className="size-3" /> {longDate(d.as_of)}
+              </span>
+              <HealthChip score={h.health_score} band={h.health_band} />
+            </div>
+          </div>
+        </section>
+      </Reveal>
+
+      {/* ── briefing: summary first, evidence one click away ── */}
+      <Reveal delay={0.04}>
+        <section className="card overflow-hidden">
+          <div className="grid gap-0 lg:grid-cols-[1.35fr_.65fr]">
+            <div className="p-5 sm:p-6">
               <div className="flex items-center gap-2">
-                <span className="rw-chip border-border bg-surface text-muted-foreground">
-                  <CalendarClock className="size-3" /> {longDate(d.as_of)}
-                </span>
-                <HealthChip score={h.health_score} band={h.health_band} />
+                <Sparkles className="size-3.5 text-forest-3" aria-hidden />
+                <p className="eyebrow">Plain-language briefing</p>
               </div>
+              {br.data?.lines && (
+                <ul className="mt-4 grid gap-2.5 sm:grid-cols-2">
+                  {br.data.lines.map((l: any, i: number) => (
+                    <li key={i}
+                        className="flex items-start gap-3 rounded-2xl border border-line bg-paper-2/60 p-3">
+                      <span className="mt-0.5 grid size-7 shrink-0 place-items-center rounded-lg border border-line bg-card">
+                        <BriefIcon kind={l.kind} />
+                      </span>
+                      <div className="min-w-0 flex-1">
+                        <p className="text-[12.5px] leading-relaxed text-pretty">{l.text}</p>
+                        <div className="mt-1.5"><StateBadge state={l.state} /></div>
+                      </div>
+                    </li>
+                  ))}
+                </ul>
+              )}
+              {br.data?.provenance && <Provenance>{br.data.provenance}</Provenance>}
             </div>
 
-            {br.data?.lines && (
-              <ul className="mt-5 grid gap-2.5 lg:grid-cols-2">
-                {br.data.lines.map((l: any, i: number) => (
-                  <li key={i}
-                      className="flex items-start gap-3 rounded-lg border border-border bg-background/40 p-3">
-                    <span className="mt-0.5 grid size-7 shrink-0 place-items-center rounded-md border border-border bg-surface">
-                      <BriefIcon kind={l.kind} />
-                    </span>
-                    <div className="min-w-0 flex-1">
-                      <p className="text-[13px] leading-relaxed text-pretty">{l.text}</p>
-                      <div className="mt-1.5"><StateBadge state={l.state} /></div>
-                    </div>
-                  </li>
-                ))}
-              </ul>
-            )}
-
-            {br.data?.recommended_action && (
-              <div className="mt-4 flex flex-wrap items-center justify-between gap-3 rounded-lg border border-primary/30 bg-primary-soft p-3.5">
-                <div className="min-w-0">
-                  <p className="flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-wider text-primary">
+            <div className="border-t border-line bg-sage p-5 sm:p-6 lg:border-l lg:border-t-0">
+              {br.data?.recommended_action ? (
+                <>
+                  <p className="flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-[.12em] text-forest-3">
                     <Lightbulb className="size-3.5" /> Do this first
                   </p>
-                  <p className="mt-1 text-sm font-medium">{br.data.recommended_action.title}</p>
-                  <p className="mt-0.5 text-xs text-muted-foreground text-pretty">
+                  <p className="mt-3 text-[22px] font-semibold leading-tight tracking-tight text-balance">
+                    {br.data.recommended_action.title}
+                  </p>
+                  <p className="mt-2 text-[13px] leading-relaxed text-ink-2 text-pretty">
                     {br.data.recommended_action.action}
                   </p>
-                </div>
-                <Link href="/app/recommendations"
-                      className="inline-flex shrink-0 items-center gap-1.5 rounded-lg bg-primary px-3.5 py-2 text-xs font-medium text-primary-foreground hover:opacity-92">
-                  View all <ArrowRight className="size-3.5" />
-                </Link>
-              </div>
-            )}
-
-            {br.data?.provenance && <Provenance>{br.data.provenance}</Provenance>}
+                  <Link href="/app/recommendations"
+                        className="btn btn-primary mt-5 h-9 w-full text-[13px]">
+                    See the evidence <ArrowRight className="size-3.5" />
+                  </Link>
+                </>
+              ) : (
+                <p className="text-[13px] leading-relaxed text-ink-2">
+                  No single action outranks the others today. Open the recommendation
+                  queue to see the full ranked list.
+                </p>
+              )}
+            </div>
           </div>
         </section>
       </Reveal>
 
       {/* ── headline tiles ── */}
-      <Reveal delay={0.05}>
+      <Reveal delay={0.07}>
         <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
           <Stat
             label="Available cash" value={money(h.available_cash)} state="actual"
@@ -138,7 +154,7 @@ export default function HomePage() {
             title="Cash flow outlook"
             description={f ? `${f.paths.toLocaleString("en-IN")} simulated paths, seed ${f.seed}. The band is the P10–P90 range.` : undefined}
             actions={<Link href="/app/forecasts"
-                           className="rounded-md border border-border px-2.5 py-1 text-xs hover:bg-surface-hover">
+                           className="btn btn-ghost btn-sm text-[12px]">
               Open forecast
             </Link>}
             bodyClass="p-2 pt-3">
@@ -158,13 +174,13 @@ export default function HomePage() {
           </Panel>
         </Reveal>
 
-        <Reveal delay={0.15}>
+        <Reveal delay={0.13}>
           <div className="flex h-full flex-col gap-4">
             <Panel title="Business health" bodyClass="p-4">
               <div className="flex items-center gap-4">
                 <HealthGauge score={d.health.score} size={132} />
                 <div className="min-w-0 flex-1">
-                  <p className="font-display text-lg font-semibold">{d.health.band}</p>
+                  <p className="text-[22px] font-semibold leading-tight tracking-tight">{d.health.band}</p>
                   <p className="mt-0.5 text-xs text-muted-foreground">
                     Weighted over eight dimensions
                   </p>
@@ -220,7 +236,7 @@ export default function HomePage() {
 
       {/* ── ageing + obligations + flows ── */}
       <div className="grid gap-4 lg:grid-cols-3">
-        <Reveal delay={0.2}>
+        <Reveal delay={0.16}>
           <Panel title="Receivables ageing"
                  description={`${pct(d.ageing.overdue_share)} of the book is past due`}
                  bodyClass="p-2 pt-3">
@@ -236,7 +252,7 @@ export default function HomePage() {
           </Panel>
         </Reveal>
 
-        <Reveal delay={0.25}>
+        <Reveal delay={0.19}>
           <Panel title="Due in the next 30 days"
                  description="Statutory and contractual commitments"
                  actions={<Link href="/app/compliance"
@@ -271,7 +287,7 @@ export default function HomePage() {
           </Panel>
         </Reveal>
 
-        <Reveal delay={0.3}>
+        <Reveal delay={0.22}>
           <Panel title="Expected cash movement"
                  description="Week by week, from the simulation" bodyClass="p-2 pt-3">
             {f ? <FlowBars weeks={f.week_starts} inflow={f.inflow_p50}
@@ -281,19 +297,19 @@ export default function HomePage() {
       </div>
 
       {/* ── recommendations ── */}
-      <Reveal delay={0.35}>
+      <Reveal delay={0.25}>
         <SectionHeader
           title="What to do today"
           description="Ranked by urgency, cash impact, evidence, ease and reversibility. Nothing happens without your approval."
           actions={<Link href="/app/recommendations"
-                         className="rounded-md border border-border px-2.5 py-1 text-xs hover:bg-surface-hover">
+                         className="btn btn-ghost btn-sm text-[12px]">
             All recommendations
           </Link>} />
         <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
           {d.recommendations.map((r: any) => (
-            <article key={r.code} className="rw-card flex flex-col p-4">
+            <article key={r.code} className="card flex flex-col p-5">
               <div className="flex items-start justify-between gap-2">
-                <span className="rw-chip border-primary/30 bg-primary-soft text-primary">
+                <span className="pill bg-sage text-forest">
                   P{r.priority}
                 </span>
                 {r.deadline && (
@@ -319,7 +335,7 @@ export default function HomePage() {
       </Reveal>
 
       {/* ── data quality footer ── */}
-      <Reveal delay={0.4}>
+      <Reveal delay={0.28}>
         <div className="rw-surface flex flex-wrap items-center justify-between gap-3 p-3.5">
           <div className="flex items-center gap-3">
             <Gauge className="size-4 text-muted-foreground" aria-hidden />
@@ -368,8 +384,8 @@ function BriefIcon({ kind }: { kind: string }) {
 
 function HomeSkeleton() {
   return (
-    <div className="space-y-6">
-      <LoadingPanel rows={4} title="briefing" />
+    <div className="space-y-7">
+      <LoadingPanel rows={3} title="briefing" />
       <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
         {[0, 1, 2, 3].map((i) => <LoadingPanel key={i} rows={1} />)}
       </div>

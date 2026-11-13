@@ -32,8 +32,8 @@ export default function SharedReport({ params }: { params: Promise<{ token: stri
   }, [token]);
 
   return (
-    <div className="min-h-dvh rw-noise">
-      <header className="sticky top-0 z-30 border-b border-border bg-background/85 backdrop-blur-md print:static print:bg-transparent">
+    <div className="relative min-h-dvh rw-noise">
+      <header className="sticky top-0 z-30 border-b border-line bg-paper/90 backdrop-blur-md print:static print:bg-transparent">
         <div className="mx-auto flex max-w-4xl items-center justify-between gap-3 px-5 py-4">
           <Logo />
           <div className="flex items-center gap-2">
@@ -43,9 +43,9 @@ export default function SharedReport({ params }: { params: Promise<{ token: stri
             {data && (
               <button
                 onClick={() => window.print()}
-                className="rounded-lg border border-border px-2.5 py-1.5 text-[11px] text-muted-foreground transition-colors hover:bg-surface-hover print:hidden"
+                className="btn btn-ghost btn-sm print:hidden"
               >
-                <Printer className="mr-1 inline size-3" aria-hidden /> Print
+                <Printer className="inline size-3" aria-hidden /> Print
               </button>
             )}
           </div>
@@ -75,7 +75,7 @@ export default function SharedReport({ params }: { params: Promise<{ token: stri
                 <div className="flex items-start gap-3">
                   <FileBarChart className="mt-1 size-5 shrink-0 text-primary" aria-hidden />
                   <div className="min-w-0">
-                    <h1 className="font-display text-2xl font-semibold tracking-tight text-balance">
+                    <h1 className="display text-2xl text-balance">
                       {data.report.business.name}
                     </h1>
                     <p className="mt-1 text-sm text-muted-foreground">
