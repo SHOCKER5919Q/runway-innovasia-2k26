@@ -162,7 +162,13 @@ def state_compare(body: CompareIn, db: DbDep, ctx: Tenant):
 
 @router.get("/forecast")
 def forecast(db: DbDep, ctx: Tenant, as_of: AsOf):
-    return state_predicted(db, ctx, as_of)
+    out = state_predicted(db, ctx, as_of)
+    # state_predicted uses the light bundle, which skips sensitivity, so the
+    # Cash Runway page always said "Not computed for this view". The full
+    # bundle is normally already cached by the dashboard.
+    if not out.get("sensitivity"):
+        out["sensitivity"] = jsonable(get_bundle(db, ctx.business_id, as_of).sensitivity)
+    return out
 
 
 @router.get("/risk")
