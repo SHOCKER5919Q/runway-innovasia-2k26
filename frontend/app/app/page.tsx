@@ -25,6 +25,13 @@ export default function HomePage() {
   if (ov.loading || !ov.data) return <HomeSkeleton />;
 
   const d = ov.data;
+  // A brand-new workspace has no ledger. Without data the engine could only
+  // show its default assumptions and random shocks (a "Healthy 75" score, a
+  // runway, a "liquidity gap") - none of it about this business. Show what
+  // to do first instead, and no figures at all.
+  const empty = (d.data_quality?.transactions ?? 0) === 0
+    && (d.headline?.receivables?.paise ?? 0) === 0 && (d.headline?.payables?.paise ?? 0) === 0;
+  if (empty) return <EmptyWorkspace name={d.business?.name} />;
   const h = d.headline;
   const f = d.forecast;
 
@@ -392,6 +399,25 @@ function HomeSkeleton() {
       <div className="grid gap-4 xl:grid-cols-[1.75fr_1fr]">
         <LoadingPanel rows={6} /><LoadingPanel rows={4} />
       </div>
+    </div>
+  );
+}
+
+
+function EmptyWorkspace({ name }: { name?: string }) {
+  return (
+    <div className="mx-auto max-w-2xl py-16 text-center">
+      <p className="eyebrow">{name ?? "Your workspace"}</p>
+      <h1 className="display mt-3 text-[32px]">No data yet</h1>
+      <p className="mt-3 text-[15px] leading-relaxed text-ink-2 text-pretty">
+        RUNWAY only shows figures computed from your own ledger. Import a bank
+        statement (CSV or Excel), a GST register, a Tally export or an invoice PDF,
+        and your cash position, forecast, health score and risks will appear here.
+        About 8 weeks of bank history is enough to start; 6 months unlocks every feature.
+      </p>
+      <Link href="/app/integrations" className="btn btn-primary mt-6 inline-flex">
+        Import your first file
+      </Link>
     </div>
   );
 }

@@ -182,6 +182,12 @@ def _build(db, business_id: str, as_of: date, *, heavy: bool) -> TwinBundle:
         supplier_profiles=suppliers, health=health, anomalies=anomalies,
         stress_results=stress, obligations=obligations)
 
+    # An empty ledger has nothing to warn about or recommend: anything here
+    # would come from default assumptions and random shocks, not the business.
+    if not dq.get("transactions") and not ar_age.get("total_paise") \
+            and not (ap_age or {}).get("total_paise"):
+        findings, recs = [], []
+
     _persist_alerts(db, business_id, findings, actual.id)
     _persist_recs(db, business_id, recs, actual.id)
     db.commit()
