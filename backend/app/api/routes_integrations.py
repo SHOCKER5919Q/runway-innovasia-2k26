@@ -13,7 +13,7 @@ from app.digital_twin.digital_twin_service import invalidate
 from app.integrations.history import import_with_impact
 from app.ledger.reconciliation import refresh_overdue
 from app.integrations.service import catalogue, import_file
-from app.models import Account, ImportBatch, Transaction
+from app.models import Account, ImportBatch, Transaction, _uid
 
 router = APIRouter(prefix="/api/integrations", tags=["integrations"])
 AsOf = Annotated[date, Depends(today_param)]
@@ -126,6 +126,16 @@ async def do_import(db: DbDep, ctx: Tenant, as_of: AsOf,
 def importable_accounts(db: DbDep, ctx: Tenant):
     rows = db.scalars(select(Account).where(Account.business_id == ctx.business_id,
                                             Account.is_active.is_(True))).all()
+    if not rows:
+        # A newly registered business has no account, so nothing could be
+        # imported. Give it one; its true opening date is unknown, so it is
+        # set early enough not to refuse the owner's past statements.
+        a = Account(id=_uid(), business_id=ctx.business_id, name="Current account",
+                    kind="current", currency="INR", opening_balance_paise=0,
+                    opening_date=date(2000, 1, 1), source_system="default")
+        db.add(a)
+        db.commit()
+        rows = [a]
     return jsonable({"accounts": [{"id": a.id, "name": a.name, "kind": a.kind,
                                    "bank_name": a.bank_name,
                                    "masked_number": a.masked_number,
